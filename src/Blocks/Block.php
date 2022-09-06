@@ -128,9 +128,9 @@ class Block implements ArrayAccess {
 		 * Filters the block attributes.
 		 *
 		 * @param array $attributes Block attributes.
-		 * @param array $block_type Block type definition.
+		 * @param array $block      Block object.
 		 */
-		$attributes = apply_filters('graphql_gutenberg_block_attributes', $attributes, $block_type);
+		$attributes = apply_filters('graphql_gutenberg_block_attributes_fields', $attributes, $block_type);
 
 		if ($block_type === null) {
 			return [
@@ -183,19 +183,19 @@ class Block implements ArrayAccess {
 	}
 
 	public function __construct($data, $post_id, $registry, $order, $parent) {
-
-		$inner_blocks = $data['innerBlocks'];
-
-		// Handle reusable blocks.
-		if ('core/block' === $data['blockName'] && isset($data['attrs']['ref'])) {
-			$reusable_post = get_post(absint($data['attrs']['ref']));
-
-			if (!empty($reusable_post)) {
-				$inner_blocks = parse_blocks($reusable_post->post_content);
+		$innerBlocks = $data['innerBlocks'];
+	
+		// handle mapping reusable blocks to innerBlocks.
+		if ( $data['blockName'] === 'core/block' && ! empty( $data['attrs']['ref'] ) ) {
+			$ref            = $data['attrs']['ref'];
+					$reusablePost = get_post( $ref );
+	
+			if ( ! empty( $reusablePost ) ) {
+				$innerBlocks = parse_blocks( $reusablePost->post_content );
 			}
 		}
-
-		$this->innerBlocks = self::create_blocks($inner_blocks, $post_id, $registry, $this);
+	
+		$this->innerBlocks = self::create_blocks( $innerBlocks, $post_id, $registry, $this );
 
 		$this->name = $data['blockName'];
 		$this->postId = $post_id;
@@ -212,19 +212,19 @@ class Block implements ArrayAccess {
 		$this->attributes = $result['attributes'];
 		$this->attributesType = $result['type'];
 
-		$this->dynamicContent = $this->render_dynamic_content($data);
+		$this->dynamicContent = $this->render_dynamic_content();
 
 	}
 
-	private function render_dynamic_content($data) {
+	private function render_dynamic_content() {
 		$registry = \WP_Block_Type_Registry::get_instance();
 		$server_block_type = $registry->get_registered($this->name);
 
-		if (empty($server_block_type) || !$server_block_type->is_dynamic()) {
+		if (empty($server_block_type)) {
 			return null;
 		}
 
-		return render_block($data);
+		return $server_block_type->render($this->attributes);
 	}
 
 	public function offsetExists($offset) {
