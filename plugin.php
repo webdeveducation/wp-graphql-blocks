@@ -2,11 +2,11 @@
 
 /**
  * Plugin Name: WP GraphQL Gutenberg
- * Plugin URI: https://github.com/pristas-peter/wp-graphql-gutenberg
+ * Plugin URI: https://github.com/tomphill/wp-graphql-gutenberg
  * Description: Enable blocks in WP GraphQL.
- * Author: pristas-peter
+ * Author: Tom Phillips (based on wp-graphql-gutenberg by pristas-peter)
  * Author URI:
- * Version: 0.3.11
+ * Version: 0.3.12
  * Requires at least: 5.4
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
