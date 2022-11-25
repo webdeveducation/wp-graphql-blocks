@@ -1,4 +1,4 @@
-# WPGraphQL Gutenberg
+# WPGraphQL Gutenberg Headless
 
 Query gutenberg blocks through wp-graphql
 

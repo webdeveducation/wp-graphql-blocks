@@ -121,7 +121,7 @@ class Block implements ArrayAccess {
 		return $result;
 	}
 
-	protected static function parse_attributes($data, $block_type) {
+	protected static function parse_attributes($data, $block_type, $postId) {
 		$attributes = $data['attrs'];
 
 		/**
@@ -143,6 +143,43 @@ class Block implements ArrayAccess {
 		foreach ($block_type['deprecated'] ?? [] as $deprecated) {
 			if (!empty($deprecated['attributes'])) {
 				$types[] = $deprecated['attributes'];
+			}
+		}
+
+		if($data['blockName'] == 'core/image'){
+			if(!$attributes['height'] && !$attributes['width']){
+				// get media item
+				$img = wp_get_attachment_image_src($attributes['id'], 'full');
+				if($img){
+					$attributes['width'] = $img[1];
+					$attributes['height'] = $img[2];
+				}
+			}
+		}
+
+		// if it's an ACF block
+		if(isset($attributes['data']) && $block_type['acf_block_version']){
+			$attributesData = $attributes['data'];
+			foreach ($attributesData as $key => $value) {
+				// attributes that start with an underscore _ are set to the field keys
+				if(substr($key, 0, 1) == '_' && function_exists('get_field_object')){
+					$fieldObject = get_field_object($value);
+					if($fieldObject && ($fieldObject['type'] == 'page_link' || $fieldObject['type'] == 'post_object')){
+						$linkedPostId = $attributes['data'][substr($key, 1)];
+						$linkedPost = get_post($linkedPostId);
+						$slug = $linkedPost->post_name;
+						while($linkedPost->post_parent){
+							$linkedPost = get_post($linkedPost->post_parent);
+							if($linkedPost){
+								$slug = $linkedPost->post_name . "/" . $slug;
+							}
+						}
+						$attributes['data'][substr($key, 1)] = array(
+							'post_id' => $attributes['data'][substr($key, 1)],
+							'slug' => "/$slug"
+						);
+					}
+				}
 			}
 		}
 
@@ -198,21 +235,21 @@ class Block implements ArrayAccess {
 		$this->innerBlocks = self::create_blocks( $innerBlocks, $post_id, $registry, $this );
 
 		$this->name = $data['blockName'];
-		$this->postId = $post_id;
-		$this->blockType = $registry[$this->name];
-		$this->originalContent = self::strip_newlines($data['innerHTML']);
-		$this->saveContent = self::parse_inner_content($data);
-		$this->order = $order;
-		$this->get_parent = function () use (&$parent) {
+		//$this->postId = $post_id;
+		$blockType = $registry[$this->name];
+		//$this->originalContent = self::strip_newlines($data['innerHTML']);
+		//$this->saveContent = self::parse_inner_content($data);
+		//$this->order = $order;
+		/*$this->get_parent = function () use (&$parent) {
 			return $parent;
-		};
+		};*/
 
-		$result = self::parse_attributes($data, $this->blockType);
+		$result = self::parse_attributes($data, $blockType, $post_id);
 
 		$this->attributes = $result['attributes'];
-		$this->attributesType = $result['type'];
+		//$this->attributesType = $result['type'];
 
-		$this->dynamicContent = $this->render_dynamic_content($data);
+		//$this->dynamicContent = $this->render_dynamic_content($data);
 
 	}
 

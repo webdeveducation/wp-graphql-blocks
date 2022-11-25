@@ -28,14 +28,6 @@ class Block {
 						'type' => ['non_null' => 'String'],
 						'description' => __('Name of the block.', 'wp-graphql-gutenberg')
 					],
-					'originalContent' => [
-						'type' => 'String',
-						'description' => __('Original HTML content.', 'wp-graphql-gutenberg')
-					],
-					'saveContent' => [
-						'type' => 'String',
-						'description' => __('Original HTML content with inner blocks.', 'wp-graphql-gutenberg')
-					],
 					'innerBlocks' => [
 						'type' => [
 							'list_of' => ['non_null' => 'Block']
