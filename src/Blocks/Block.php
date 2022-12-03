@@ -146,6 +146,10 @@ class Block implements ArrayAccess {
 			}
 		}
 
+		if($data['blockName'] == 'core/post-title'){
+			$attributes['content'] = get_the_title($postId) ?? "";
+		}
+
 		if($data['blockName'] == 'core/image'){
 			if(!$attributes['height'] && !$attributes['width']){
 				// get media item
