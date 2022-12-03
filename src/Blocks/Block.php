@@ -146,6 +146,12 @@ class Block implements ArrayAccess {
 			}
 		}
 
+		if($data['blockName'] == 'core/cover'){
+			if($attributes['useFeaturedImage']){
+				$attributes['url'] = get_the_post_thumbnail_url($postId, 'full');
+			}
+		}
+
 		if($data['blockName'] == 'core/post-title'){
 			$attributes['content'] = get_the_title($postId) ?? "";
 		}
