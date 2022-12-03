@@ -12,22 +12,10 @@ class BlockEditorContentNode {
 	private $type_registry;
 
 	function __construct() {
+		$miniMode = get_option('wpgqlg_minimode');
 		$fields = [
 			'id' => [
 			   'type' => ['non_null' => 'ID']			   
-			],
-			'blocks' => [
-				'type' => [
-					'list_of' => ['non_null' => 'Block']
-				],
-				'description' => __('Gutenberg blocks', 'wp-graphql-gutenberg'),
-				'resolve' => function ($model, $args, $context, $info) {
-					return Block::create_blocks(
-						parse_blocks(get_post($model->ID)->post_content),
-						$model->ID,
-						Registry::get_registry()
-					);
-				}
 			],
 			'blocksJSON' => [
 				'type' => 'String',
@@ -91,6 +79,22 @@ class BlockEditorContentNode {
 				)
 			]
 		];
+
+		if($miniMode != 'on'){
+			$fields['blocks'] = [
+				'type' => [
+					'list_of' => ['non_null' => 'Block']
+				],
+				'description' => __('Gutenberg blocks', 'wp-graphql-gutenberg'),
+				'resolve' => function ($model, $args, $context, $info) {
+					return Block::create_blocks(
+						parse_blocks(get_post($model->ID)->post_content),
+						$model->ID,
+						Registry::get_registry()
+					);
+				}
+			];
+		}
 
 		add_action('graphql_register_types', function ($type_registry) use ($fields) {
 			$this->type_registry = $type_registry;
