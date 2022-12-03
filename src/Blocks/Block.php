@@ -164,6 +164,32 @@ class Block implements ArrayAccess {
 				// attributes that start with an underscore _ are set to the field keys
 				if(substr($key, 0, 1) == '_' && function_exists('get_field_object')){
 					$fieldObject = get_field_object($value);
+
+					// handle acf image field
+					if($fieldObject && $fieldObject['type'] == 'image'){
+						$imageId = $attributes['data'][substr($key, 1)];
+						// get media item
+						$img = wp_get_attachment_image_src($imageId, 'full');
+						$image_alt = get_post_meta($imageId, '_wp_attachment_image_alt', TRUE);
+						$image_title = get_the_title($imageId);
+
+						if($fieldObject['return_format'] == 'url'){
+							$attributes['data'][substr($key, 1)] = $img[0];
+						}else if($fieldObject['return_format'] == 'array'){
+							$attributes['data'][substr($key, 1)] = array(
+								'id' => $imageId,
+								'url' => $img[0],
+								'width' => $img[1],
+								'height' => $img[2],
+								'resized' => $img[3],
+								'alt' => $image_alt,
+								'title' => $image_title
+							);
+						}else if($fieldObject['return_format'] == 'id'){
+							$attributes['data'][substr($key, 1)] = $imageId;
+						}
+					}
+					// handle page link or post object
 					if($fieldObject && ($fieldObject['type'] == 'page_link' || $fieldObject['type'] == 'post_object')){
 						$linkedPostId = $attributes['data'][substr($key, 1)];
 						$linkedPost = get_post($linkedPostId);
