@@ -204,29 +204,17 @@ class Block implements ArrayAccess {
 					if($fieldObject && $fieldObject['type'] == 'page_link'){
 						$linkedPostId = $attributes['data'][substr($key, 1)];
 						$linkedPost = get_post($linkedPostId);
-						$slug = $linkedPost->post_name;
-						while($linkedPost->post_parent){
-							$linkedPost = get_post($linkedPost->post_parent);
-							if($linkedPost){
-								$slug = $linkedPost->post_name . "/" . $slug;
-							}
-						}
-						$attributes['data'][substr($key, 1)] = "/$slug";
+						$pageUri = get_page_uri($linkedPostId);
+						$attributes['data'][substr($key, 1)] = $pageUri;
 					}
 
 					// handle post object
 					if($fieldObject && $fieldObject['type'] == 'post_object'){
-						$linkedPostId = $attributes['data'][substr($key, 1)];
-						$linkedPost = get_post($linkedPostId);
-						$slug = $linkedPost->post_name;
-						while($linkedPost->post_parent){
-							$linkedPost = get_post($linkedPost->post_parent);
-							if($linkedPost){
-								$slug = $linkedPost->post_name . "/" . $slug;
-							}
-						}
-						$linkedPost->slug = "/$slug";
 						if($fieldObject['return_format'] == 'object'){
+							$linkedPostId = $attributes['data'][substr($key, 1)];
+							$linkedPost = get_post($linkedPostId);
+							$pageUri = get_page_uri($linkedPostId);
+							$linkedPost->uri = $pageUri;
 							$attributes['data'][substr($key, 1)] = $linkedPost;
 						}
 					}

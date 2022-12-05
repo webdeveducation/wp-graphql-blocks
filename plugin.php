@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL (supports ACF).
  * Author: Tom Phillips (based on wp-graphql-gutenberg by pristas-peter)
  * Author URI:
- * Version: 0.6.0
+ * Version: 0.6.1
  * Requires at least: 5.4
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
