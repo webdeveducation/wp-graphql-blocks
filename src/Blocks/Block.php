@@ -199,8 +199,9 @@ class Block implements ArrayAccess {
 							$attributes['data'][substr($key, 1)] = $imageId;
 						}
 					}
-					// handle page link or post object
-					if($fieldObject && ($fieldObject['type'] == 'page_link' || $fieldObject['type'] == 'post_object')){
+
+					// handle page link
+					if($fieldObject && $fieldObject['type'] == 'page_link'){
 						$linkedPostId = $attributes['data'][substr($key, 1)];
 						$linkedPost = get_post($linkedPostId);
 						$slug = $linkedPost->post_name;
@@ -210,10 +211,24 @@ class Block implements ArrayAccess {
 								$slug = $linkedPost->post_name . "/" . $slug;
 							}
 						}
-						$attributes['data'][substr($key, 1)] = array(
-							'post_id' => $attributes['data'][substr($key, 1)],
-							'slug' => "/$slug"
-						);
+						$attributes['data'][substr($key, 1)] = "/$slug";
+					}
+
+					// handle post object
+					if($fieldObject && $fieldObject['type'] == 'post_object'){
+						$linkedPostId = $attributes['data'][substr($key, 1)];
+						$linkedPost = get_post($linkedPostId);
+						$slug = $linkedPost->post_name;
+						while($linkedPost->post_parent){
+							$linkedPost = get_post($linkedPost->post_parent);
+							if($linkedPost){
+								$slug = $linkedPost->post_name . "/" . $slug;
+							}
+						}
+						$linkedPost->slug = "/$slug";
+						if($fieldObject['return_format'] == 'object'){
+							$attributes['data'][substr($key, 1)] = $linkedPost;
+						}
 					}
 				}
 			}
