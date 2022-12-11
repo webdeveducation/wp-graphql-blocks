@@ -15,7 +15,7 @@ class Block implements ArrayAccess {
 		foreach ($blocks as $block) {
 			if (empty($block['blockName'])) {
 
-				if (json_encode($block['innerHTML']) === '"\n\n"') {
+				if (wp_json_encode($block['innerHTML']) === '"\n\n"') {
 					continue;
 				}
 
@@ -211,11 +211,23 @@ class Block implements ArrayAccess {
 					// handle post object
 					if($fieldObject && $fieldObject['type'] == 'post_object'){
 						if($fieldObject['return_format'] == 'object'){
-							$linkedPostId = $attributes['data'][substr($key, 1)];
-							$linkedPost = get_post($linkedPostId);
-							$pageUri = get_page_uri($linkedPostId);
-							$linkedPost->uri = $pageUri;
-							$attributes['data'][substr($key, 1)] = $linkedPost;
+							$linkedPostIds = $attributes['data'][substr($key, 1)];
+							if(gettype($linkedPostIds) == 'array'){
+								// loop over each id
+								$posts = [];
+								foreach ($linkedPostIds as $linkedPostId) {
+									$linkedPost = get_post($linkedPostId);
+									$pageUri = get_page_uri($linkedPostId);
+									$linkedPost->uri = $pageUri;
+									array_push($posts, $linkedPost);
+								}
+								$attributes['data'][substr($key, 1)] = $posts;
+							}else{
+								$linkedPost = get_post($linkedPostIds);
+								$pageUri = get_page_uri($linkedPostIds);
+								$linkedPost->uri = $pageUri;
+								$attributes['data'][substr($key, 1)] = $linkedPost;
+							}
 						}
 					}
 				}
@@ -224,7 +236,7 @@ class Block implements ArrayAccess {
 
 		foreach ($types as $type) {
 			$schema = Schema::fromJsonString(
-				json_encode([
+				wp_json_encode([
 					'type' => 'object',
 					'properties' => $type,
 					'additionalProperties' => false
@@ -236,7 +248,7 @@ class Block implements ArrayAccess {
 			// Convert $attributes to an object, handle both nested and empty objects.
 			$attrs = empty($attributes)
 				? (object)$attributes
-				: json_decode(json_encode($attributes), false);
+				: json_decode(wp_json_encode($attributes), false);
 			$result = $validator->schemaValidation($attrs, $schema);
 
 			if ($result->isValid()) {
@@ -276,7 +288,7 @@ class Block implements ArrayAccess {
 		$this->name = $data['blockName'];
 		//$this->postId = $post_id;
 		$blockType = $registry[$this->name];
-		//$this->originalContent = self::strip_newlines($data['innerHTML']);
+		$this->originalContent = self::strip_newlines($data['innerHTML']);
 		//$this->saveContent = self::parse_inner_content($data);
 		//$this->order = $order;
 		/*$this->get_parent = function () use (&$parent) {

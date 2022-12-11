@@ -27,32 +27,8 @@ class BlockEditorContentNode {
 						Registry::get_registry()
 					);
 
-					return json_encode($blocks);
+					return wp_json_encode($blocks);
 				}
-			],
-			'previewBlocks' => [
-				'type' => [
-					'list_of' => ['non_null' => 'Block']
-				],
-				'description' => __('Previewed gutenberg blocks', 'wp-graphql-gutenberg'),
-				'resolve' => Utils::ensure_capability(
-					function ($model) {
-						$id = BlockEditorPreview::get_preview_id($model->ID, $model->ID);
-
-						if (!empty($id)) {
-							return Block::create_blocks(
-								parse_blocks(get_post($id)->post_content),
-								$id,
-								Registry::get_registry()
-							);
-						}
-
-						return null;
-					},
-					function ($cap) {
-						return $cap->edit_posts;
-					}
-				)
 			],
 			'previewBlocksJSON' => [
 				'type' => 'String',
@@ -62,7 +38,7 @@ class BlockEditorContentNode {
 						$id = BlockEditorPreview::get_preview_id($model->ID, $model->ID);
 
 						if (!empty($id)) {
-							return json_encode(
+							return wp_json_encode(
 								Block::create_blocks(
 									parse_blocks(get_post($id)->post_content),
 									$id,
@@ -94,17 +70,42 @@ class BlockEditorContentNode {
 					);
 				}
 			];
+			$fields['previewBlocks'] = [
+				'type' => [
+					'list_of' => ['non_null' => 'Block']
+				],
+				'description' => __('Previewed gutenberg blocks', 'wp-graphql-gutenberg'),
+				'resolve' => Utils::ensure_capability(
+					function ($model) {
+						$id = BlockEditorPreview::get_preview_id($model->ID, $model->ID);
+
+						if (!empty($id)) {
+							return Block::create_blocks(
+								parse_blocks(get_post($id)->post_content),
+								$id,
+								Registry::get_registry()
+							);
+						}
+
+						return null;
+					},
+					function ($cap) {
+						return $cap->edit_posts;
+					}
+				)
+			];
 		}
 
 		add_action('graphql_register_types', function ($type_registry) use ($fields) {
 			$this->type_registry = $type_registry;
 
 			register_graphql_interface_type('BlockEditorContentNode', [
-				'description' => __('Gutenberg post interface', 'wp-graphql-gutenberg'),
-				'fields' => $fields,
-				'resolveType' => function ($model) use ($type_registry) {
-					return $type_registry->get_type(Utils::get_post_graphql_type($model, $type_registry));
-				}
+				'description' => __( 'Gutenberg post interface', 'wp-graphql-gutenberg' ),
+				'interfaces'  => [ 'Node' ],
+				'fields'      => $fields,
+				'resolveType' => function ( $model ) use ( $type_registry ) {
+					return $type_registry->get_type( Utils::get_post_graphql_type( $model, $type_registry ) );
+				},
 			]);
 
 			$types = Utils::get_editor_graphql_types();

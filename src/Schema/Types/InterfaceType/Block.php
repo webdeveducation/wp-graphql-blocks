@@ -72,7 +72,7 @@ class Block {
 						'type' => 'String',
 						'description' => __('Block attributes, JSON encoded', 'wp-graphql-gutenberg'),
 						'resolve' => function ($block, $args, $context, $info) {
-							return json_encode($block->attributes);
+							return wp_json_encode($block->attributes);
 						}
 					]
 				],

@@ -55,7 +55,7 @@ class Settings {
 	function miniModePage(){ ?>
 		<div class='wrap'>
 			<h1>Mini Mode</h1>
-			<p>Enabling mini mode will disable the ability to query for <code>blocks</code>. However, <code>blocksJSON</code> will still be available.</p>
+			<h2>Enable this mode when working with Gatsby</h2>
 			<?php settings_errors(); ?>
 			<form action="options.php" method="POST">
 				<?php

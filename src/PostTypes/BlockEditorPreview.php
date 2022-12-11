@@ -271,7 +271,7 @@ class BlockEditorPreview {
 			register_graphql_field(WP_GRAPHQL_GUTENBERG_PREVIEW_GRAPHQL_SINGLE_NAME, 'blocksJSON', [
 				'type' => 'String',
 				'resolve' => function ($model) {
-					return json_encode(
+					return wp_json_encode(
 						Block::create_blocks(
 							parse_blocks(get_post($model->ID)->post_content),
 							$model->ID,

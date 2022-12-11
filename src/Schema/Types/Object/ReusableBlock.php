@@ -69,7 +69,7 @@ class ReusableBlock {
 							$id = BlockEditorPreview::get_preview_id($model->ID, $args['databaseId']);
 
 							if (!empty($id)) {
-								return json_encode(
+								return wp_json_encode(
 									Block::create_blocks(
 										parse_blocks(get_post($id)->post_content),
 										$id,

@@ -178,7 +178,7 @@ class Server {
 			'headers' => [
 				'Content-Type' => 'application/json; charset=utf-8'
 			],
-			'body' => json_encode(
+			'body' => wp_json_encode(
 				array_merge($data, [
 					'url' => $url,
 					'cookies' => [

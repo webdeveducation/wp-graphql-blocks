@@ -179,7 +179,7 @@ class BlockTypes {
 
 			$types[] = $type;
 
-			$key = json_encode($definition);
+			$key = wp_json_encode($definition);
 
 			if ($key !== $non_deprecated_definition_key) {
 				$types_by_definition[$key] = $type;
@@ -197,7 +197,7 @@ class BlockTypes {
 				'typeNames' => $types,
 				'resolveType' => function ($attributes) use ($types_by_definition) {
 
-					return $types_by_definition[json_encode($attributes['__type'])];
+					return $types_by_definition[wp_json_encode($attributes['__type'])];
 
 				},
 			]);
