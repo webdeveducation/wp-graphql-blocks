@@ -205,7 +205,7 @@ class Block implements ArrayAccess {
 						$linkedPostId = $attributes['data'][substr($key, 1)];
 						$linkedPost = get_post($linkedPostId);
 						$pageUri = get_page_uri($linkedPostId);
-						$attributes['data'][substr($key, 1)] = $pageUri;
+						$attributes['data'][substr($key, 1)] = "/$pageUri";
 					}
 
 					// handle post object
@@ -218,14 +218,14 @@ class Block implements ArrayAccess {
 								foreach ($linkedPostIds as $linkedPostId) {
 									$linkedPost = get_post($linkedPostId);
 									$pageUri = get_page_uri($linkedPostId);
-									$linkedPost->uri = $pageUri;
+									$linkedPost->uri = "/$pageUri";
 									array_push($posts, $linkedPost);
 								}
 								$attributes['data'][substr($key, 1)] = $posts;
 							}else{
 								$linkedPost = get_post($linkedPostIds);
 								$pageUri = get_page_uri($linkedPostIds);
-								$linkedPost->uri = $pageUri;
+								$linkedPost->uri = "/$pageUri";
 								$attributes['data'][substr($key, 1)] = $linkedPost;
 							}
 						}
