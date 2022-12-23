@@ -138,13 +138,7 @@ class Block implements ArrayAccess {
 			];
 		}
 
-		$types = [$block_type['attributes']];
-
-		foreach ($block_type['deprecated'] ?? [] as $deprecated) {
-			if (!empty($deprecated['attributes'])) {
-				$types[] = $deprecated['attributes'];
-			}
-		}
+		//wp_send_json(['data' => $block_type]);
 
 		if($data['blockName'] == 'core/cover'){
 			if($attributes['useFeaturedImage']){
@@ -234,6 +228,14 @@ class Block implements ArrayAccess {
 			}
 		}
 
+		$types = [$block_type['attributes']];
+
+		foreach ($block_type['deprecated'] ?? [] as $deprecated) {
+			if (!empty($deprecated['attributes'])) {
+				$types[] = $deprecated['attributes'];
+			}
+		}
+
 		foreach ($types as $type) {
 			$schema = Schema::fromJsonString(
 				wp_json_encode([
@@ -286,7 +288,6 @@ class Block implements ArrayAccess {
 		$this->innerBlocks = self::create_blocks( $innerBlocks, $post_id, $registry, $this );
 
 		$this->name = $data['blockName'];
-		//$this->postId = $post_id;
 		$blockType = $registry[$this->name];
 		$this->originalContent = self::strip_newlines($data['innerHTML']);
 		//$this->saveContent = self::parse_inner_content($data);
@@ -300,8 +301,76 @@ class Block implements ArrayAccess {
 		$this->attributes = $result['attributes'];
 		//$this->attributesType = $result['type'];
 
-		//$this->dynamicContent = $this->render_dynamic_content($data);
+		$this->dynamicContent = $this->render_dynamic_content($data);
 
+		if($this->name == 'core/gallery'){
+			$classId = $this->get_core_gallery_class_id();
+			$this->inlineClassnames = $classId;
+			$this->inlineStylesheet = $this->get_core_gallery_stylesheet($classId);
+		}
+	}
+
+	private function get_core_gallery_class_id(){
+		$needle = "wp-block-gallery-";
+		$startPos = strpos($this->dynamicContent, $needle);
+		$endPos = strpos($this->dynamicContent, " ", $startPos);
+		$classId = substr($this->dynamicContent, $startPos, $endPos - $startPos);
+		return $classId;
+	}
+
+	private function get_core_gallery_stylesheet($classId){		
+		$gap = _wp_array_get( $this->attributes, array( 'style', 'spacing', 'blockGap' ) );
+		// Skip if gap value contains unsupported characters.
+		// Regex for CSS value borrowed from `safecss_filter_attr`, and used here
+		// because we only want to match against the value, not the CSS attribute.
+		if ( is_array( $gap ) ) {
+			foreach ( $gap as $key => $value ) {
+				// Make sure $value is a string to avoid PHP 8.1 deprecation error in preg_match() when the value is null.
+				$value = is_string( $value ) ? $value : '';
+				$value = $value && preg_match( '%[\\\(&=}]|/\*%', $value ) ? null : $value;
+
+				// Get spacing CSS variable from preset value if provided.
+				if ( is_string( $value ) && str_contains( $value, 'var:preset|spacing|' ) ) {
+					$index_to_splice = strrpos( $value, '|' ) + 1;
+					$slug            = _wp_to_kebab_case( substr( $value, $index_to_splice ) );
+					$value           = "var(--wp--preset--spacing--$slug)";
+				}
+
+				$gap[ $key ] = $value;
+			}
+		} else {
+			// Make sure $gap is a string to avoid PHP 8.1 deprecation error in preg_match() when the value is null.
+			$gap = is_string( $gap ) ? $gap : '';
+			$gap = $gap && preg_match( '%[\\\(&=}]|/\*%', $gap ) ? null : $gap;
+
+			// Get spacing CSS variable from preset value if provided.
+			if ( is_string( $gap ) && str_contains( $gap, 'var:preset|spacing|' ) ) {
+				$index_to_splice = strrpos( $gap, '|' ) + 1;
+				$slug            = _wp_to_kebab_case( substr( $gap, $index_to_splice ) );
+				$gap             = "var(--wp--preset--spacing--$slug)";
+			}
+		}
+
+		// --gallery-block--gutter-size is deprecated. --wp--style--gallery-gap-default should be used by themes that want to set a default
+		// gap on the gallery.
+		$fallback_gap = 'var( --wp--style--gallery-gap-default, var( --gallery-block--gutter-size, var( --wp--style--block-gap, 0.5em ) ) )';
+		$gap_value    = $gap ? $gap : $fallback_gap;
+		$gap_column   = $gap_value;
+
+		if ( is_array( $gap_value ) ) {
+			$gap_row    = isset( $gap_value['top'] ) ? $gap_value['top'] : $fallback_gap;
+			$gap_column = isset( $gap_value['left'] ) ? $gap_value['left'] : $fallback_gap;
+			$gap_value  = $gap_row === $gap_column ? $gap_row : $gap_row . ' ' . $gap_column;
+		}
+
+		// The unstable gallery gap calculation requires a real value (such as `0px`) and not `0`.
+		if ( '0' === $gap_column ) {
+			$gap_column = '0px';
+		}
+
+		// Set the CSS variable to the column value, and the `gap` property to the combined gap value.
+		$style = '.wp-block-gallery.' . $classId . '{ --wp--style--unstable-gallery-gap: ' . $gap_column . '; gap: ' . $gap_value . '}';
+		return $style;
 	}
 
 	private function render_dynamic_content($data) {

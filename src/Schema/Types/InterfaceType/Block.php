@@ -65,6 +65,14 @@ class Block {
 						'type' => 'String',
 						'description' => __('Server side rendered content.', 'wp-graphql-gutenberg')
 					],
+					'inlineStylesheet' => [
+						'type' => 'String',
+						'description' => __('Any additional inline styles.', 'wp-graphql-gutenberg')
+					],
+					'inlineClassnames' => [
+						'type' => 'String',
+						'description' => __('Any additional classes.', 'wp-graphql-gutenberg')
+					],
 					'order' => [
 						'type' => ['non_null' => 'Int']
 					],
