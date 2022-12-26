@@ -169,6 +169,11 @@ class Block implements ArrayAccess {
 				if(substr($key, 0, 1) == '_' && function_exists('get_field_object')){
 					$fieldObject = get_field_object($value);
 
+					// handle acf taxonomy
+					if($fieldObject && $fieldObject['type'] == 'taxonomy'){
+						//wp_send_json(['data' => $fieldObject]);
+					}
+
 					// handle acf image field
 					if($fieldObject && $fieldObject['type'] == 'image'){
 						$imageId = $attributes['data'][substr($key, 1)];
