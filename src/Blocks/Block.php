@@ -140,9 +140,25 @@ class Block implements ArrayAccess {
 
 		//wp_send_json(['data' => $block_type]);
 
+		if($data['blockName'] == 'core/media-text'){
+			// get media item
+			$img = wp_get_attachment_image_src($attributes['mediaId'], 'full');
+			if($img){
+				$attributes['width'] = $img[1];
+				$attributes['height'] = $img[2];
+			}
+		}
+
 		if($data['blockName'] == 'core/cover'){
 			if($attributes['useFeaturedImage']){
+				$attributes['id'] = get_post_thumbnail_id($postId);
 				$attributes['url'] = get_the_post_thumbnail_url($postId, 'full');
+			}
+			// get media item
+			$img = wp_get_attachment_image_src($attributes['id'], 'full');
+			if($img){
+				$attributes['width'] = $img[1];
+				$attributes['height'] = $img[2];
 			}
 		}
 
