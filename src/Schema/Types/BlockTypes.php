@@ -63,14 +63,14 @@ class BlockTypes {
 						if ($of_type !== null) {
 							$type = ['list_of' => $of_type];
 						} else {
-							$type = Scalar::BlockAttributesArray();
+							$type = 'JSON';
 						}
 					} else {
-						$type = Scalar::BlockAttributesArray();
+						$type = 'JSON';
 					}
 					break;
 				case 'object':
-					$type = Scalar::BlockAttributesObject();
+					$type = 'JSON';
 					break;
 			}
 		} elseif (isset($attribute['source'])) {

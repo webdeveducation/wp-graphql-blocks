@@ -138,12 +138,9 @@ class Server {
 								// BlockEditorContentNode interface
 								'blockEditorContentNodes',
 								'blocks',
-								'blocksJSON',
 								// ReusableBlock type
 								'reusableBlock',
 								'reusableBlocks'
-								// previews are stored in DB, so should be safe
-								// 'previewBlocks', 'previewBlocksJSON','blockEditorPreview', 'blockEditorPreviews',
 							],
 							true
 						)

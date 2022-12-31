@@ -1,6 +1,6 @@
 {
-	"name": "wp-graphql-gutenberg",
-	"version": "0.6.5",
+	"name": "@webdeveducation/wp-graphql-blocks",
+	"version": "1.0.0",
 	"private": true,
 	"scripts": {
 		"build": "wp-scripts build",

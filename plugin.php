@@ -1,13 +1,13 @@
 <?php
 
 /**
- * Plugin Name: WP GraphQL Gutenberg Headless
- * Plugin URI: https://github.com/tomphill/wp-graphql-gutenberg
- * Description: Enable blocks in WP GraphQL (supports ACF).
- * Author: Tom Phillips (based on wp-graphql-gutenberg by pristas-peter)
- * Author URI:
- * Version: 0.6.5
- * Requires at least: 5.8
+ * Plugin Name: WP GraphQL Blocks
+ * Plugin URI: https://github.com/webdeveducation/wp-graphql-blocks
+ * Description: Enable blocks in WP GraphQL. Based on wp-graphql-gutenberg by pristas-peter.
+ * Author: WebDevEducation 
+ * Author URI: https://webdeveducation.com
+ * Version: 1.0.0
+ * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
  */

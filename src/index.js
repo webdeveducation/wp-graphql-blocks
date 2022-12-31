@@ -32,7 +32,7 @@ if ( isServer ) {
 	registerBlockEditorPreview();
 
 	domReady( () => {
-		const admin = document.getElementById( 'wp-graphql-gutenberg-admin' );
+		const admin = document.getElementById( 'wp-graphql-blocks-admin' );
 
 		if ( admin ) {
 			render( <Settings />, admin );

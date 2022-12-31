@@ -243,7 +243,7 @@ class BlockEditorPreview {
 				}
 			]);
 
-			register_graphql_field(WP_GRAPHQL_GUTENBERG_PREVIEW_GRAPHQL_SINGLE_NAME, 'blocks', [
+			/*register_graphql_field(WP_GRAPHQL_GUTENBERG_PREVIEW_GRAPHQL_SINGLE_NAME, 'blocks', [
 				'type' => ['list_of' => ['non_null' => 'Block']],
 				'resolve' => function ($model) {
 					return Block::create_blocks(
@@ -252,7 +252,7 @@ class BlockEditorPreview {
 						Registry::get_registry()
 					);
 				}
-			]);
+			]);*/
 
 			register_graphql_field(WP_GRAPHQL_GUTENBERG_PREVIEW_GRAPHQL_SINGLE_NAME, 'previewedDatabaseId', [
 				'type' => 'Int',
@@ -268,8 +268,8 @@ class BlockEditorPreview {
 				}
 			]);
 
-			register_graphql_field(WP_GRAPHQL_GUTENBERG_PREVIEW_GRAPHQL_SINGLE_NAME, 'blocksJSON', [
-				'type' => 'String',
+			register_graphql_field(WP_GRAPHQL_GUTENBERG_PREVIEW_GRAPHQL_SINGLE_NAME, 'blocks', [
+				'type' => 'JSON',
 				'resolve' => function ($model) {
 					return wp_json_encode(
 						Block::create_blocks(

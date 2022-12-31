@@ -2,8 +2,8 @@
 
 namespace WPGraphQLGutenberg\Blocks;
 
-if (!defined('WP_GRAPHQL_GUTENBERG_REGISTRY_OPTION_NAME')) {
-	define('WP_GRAPHQL_GUTENBERG_REGISTRY_OPTION_NAME', 'wp_graphql_gutenberg_block_types');
+if (!defined('WP_GRAPHQL_BLOCKS_REGISTRY_OPTION_NAME')) {
+	define('WP_GRAPHQL_BLOCKS_REGISTRY_OPTION_NAME', 'wp_graphql_blocks_block_types');
 }
 
 use GraphQL\Error\ClientAware;
@@ -31,11 +31,11 @@ class Registry {
 	}
 
 	public static function update_registry($registry) {
-		return update_option(WP_GRAPHQL_GUTENBERG_REGISTRY_OPTION_NAME, $registry, false);
+		return update_option(WP_GRAPHQL_BLOCKS_REGISTRY_OPTION_NAME, $registry, false);
 	}
 
 	public static function get_registry() {
-		$registry = get_option(WP_GRAPHQL_GUTENBERG_REGISTRY_OPTION_NAME) ?? null;
+		$registry = get_option(WP_GRAPHQL_BLOCKS_REGISTRY_OPTION_NAME) ?? null;
 
 		if (empty($registry)) {
 			throw new RegistryNotSourcedException(
@@ -50,6 +50,6 @@ class Registry {
 	}
 
 	public static function delete_registry() {
-		return delete_option(WP_GRAPHQL_GUTENBERG_REGISTRY_OPTION_NAME);
+		return delete_option(WP_GRAPHQL_BLOCKS_REGISTRY_OPTION_NAME);
 	}
 }

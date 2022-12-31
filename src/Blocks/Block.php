@@ -138,8 +138,6 @@ class Block implements ArrayAccess {
 			];
 		}
 
-		//wp_send_json(['data' => $block_type]);
-
 		if($data['blockName'] == 'core/media-text'){
 			// get media item
 			$img = wp_get_attachment_image_src($attributes['mediaId'], 'full');
@@ -177,77 +175,7 @@ class Block implements ArrayAccess {
 			}
 		}
 
-		// if it's an ACF block
-		if(isset($attributes['data']) && $block_type['acf_block_version']){
-			$attributesData = $attributes['data'];
-			foreach ($attributesData as $key => $value) {
-				// attributes that start with an underscore _ are set to the field keys
-				if(substr($key, 0, 1) == '_' && function_exists('get_field_object')){
-					$fieldObject = get_field_object($value);
-
-					// handle acf taxonomy
-					if($fieldObject && $fieldObject['type'] == 'taxonomy'){
-						//wp_send_json(['data' => $fieldObject]);
-					}
-
-					// handle acf image field
-					if($fieldObject && $fieldObject['type'] == 'image'){
-						$imageId = $attributes['data'][substr($key, 1)];
-						// get media item
-						$img = wp_get_attachment_image_src($imageId, 'full');
-						$image_alt = get_post_meta($imageId, '_wp_attachment_image_alt', TRUE);
-						$image_title = get_the_title($imageId);
-
-						if($fieldObject['return_format'] == 'url'){
-							$attributes['data'][substr($key, 1)] = $img[0];
-						}else if($fieldObject['return_format'] == 'array'){
-							$attributes['data'][substr($key, 1)] = array(
-								'id' => $imageId,
-								'url' => $img[0],
-								'width' => $img[1],
-								'height' => $img[2],
-								'resized' => $img[3],
-								'alt' => $image_alt,
-								'title' => $image_title
-							);
-						}else if($fieldObject['return_format'] == 'id'){
-							$attributes['data'][substr($key, 1)] = $imageId;
-						}
-					}
-
-					// handle page link
-					if($fieldObject && $fieldObject['type'] == 'page_link'){
-						$linkedPostId = $attributes['data'][substr($key, 1)];
-						$linkedPost = get_post($linkedPostId);
-						$pageUri = get_page_uri($linkedPostId);
-						$attributes['data'][substr($key, 1)] = "/$pageUri";
-					}
-
-					// handle post object
-					if($fieldObject && $fieldObject['type'] == 'post_object'){
-						if($fieldObject['return_format'] == 'object'){
-							$linkedPostIds = $attributes['data'][substr($key, 1)];
-							if(gettype($linkedPostIds) == 'array'){
-								// loop over each id
-								$posts = [];
-								foreach ($linkedPostIds as $linkedPostId) {
-									$linkedPost = get_post($linkedPostId);
-									$pageUri = get_page_uri($linkedPostId);
-									$linkedPost->uri = "/$pageUri";
-									array_push($posts, $linkedPost);
-								}
-								$attributes['data'][substr($key, 1)] = $posts;
-							}else{
-								$linkedPost = get_post($linkedPostIds);
-								$pageUri = get_page_uri($linkedPostIds);
-								$linkedPost->uri = "/$pageUri";
-								$attributes['data'][substr($key, 1)] = $linkedPost;
-							}
-						}
-					}
-				}
-			}
-		}
+		$attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $block_type, $data, $postId);
 
 		$types = [$block_type['attributes']];
 
@@ -306,22 +234,16 @@ class Block implements ArrayAccess {
 			}
 		}
 	
-		$this->innerBlocks = self::create_blocks( $innerBlocks, $post_id, $registry, $this );
-
 		$this->name = $data['blockName'];
 		$blockType = $registry[$this->name];
-		$this->originalContent = self::strip_newlines($data['innerHTML']);
 		//$this->saveContent = self::parse_inner_content($data);
 		//$this->order = $order;
-		/*$this->get_parent = function () use (&$parent) {
-			return $parent;
-		};*/
 
 		$result = self::parse_attributes($data, $blockType, $post_id);
 
 		$this->attributes = $result['attributes'];
 		//$this->attributesType = $result['type'];
-
+		$this->originalContent = self::strip_newlines($data['innerHTML']);
 		$this->dynamicContent = $this->render_dynamic_content($data);
 
 		if($this->name == 'core/gallery'){
@@ -329,6 +251,8 @@ class Block implements ArrayAccess {
 			$this->inlineClassnames = $classId;
 			$this->inlineStylesheet = $this->get_core_gallery_stylesheet($classId);
 		}
+
+		$this->innerBlocks = self::create_blocks( $innerBlocks, $post_id, $registry, $this );
 	}
 
 	private function get_core_gallery_class_id(){

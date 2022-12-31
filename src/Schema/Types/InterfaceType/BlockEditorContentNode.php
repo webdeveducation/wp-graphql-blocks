@@ -12,14 +12,13 @@ class BlockEditorContentNode {
 	private $type_registry;
 
 	function __construct() {
-		$miniMode = get_option('wpgqlg_minimode');
 		$fields = [
 			'id' => [
 			   'type' => ['non_null' => 'ID']			   
 			],
-			'blocksJSON' => [
-				'type' => 'String',
-				'description' => __('Gutenberg blocks as json string', 'wp-graphql-gutenberg'),
+			'blocks' => [
+				'type' => 'JSON',
+				'description' => __('Gutenberg blocks as json object', 'wp-graphql-gutenberg'),
 				'resolve' => function ($model, $args, $context, $info) {
 					$blocks = Block::create_blocks(
 						parse_blocks(get_post($model->ID)->post_content),
@@ -29,72 +28,8 @@ class BlockEditorContentNode {
 
 					return wp_json_encode($blocks);
 				}
-			],
-			'previewBlocksJSON' => [
-				'type' => 'String',
-				'description' => __('Previewed Gutenberg blocks as json string', 'wp-graphql-gutenberg'),
-				'resolve' => Utils::ensure_capability(
-					function ($model) {
-						$id = BlockEditorPreview::get_preview_id($model->ID, $model->ID);
-
-						if (!empty($id)) {
-							return wp_json_encode(
-								Block::create_blocks(
-									parse_blocks(get_post($id)->post_content),
-									$id,
-									Registry::get_registry()
-								)
-							);
-						}
-
-						return null;
-					},
-					function ($cap) {
-						return $cap->edit_posts;
-					}
-				)
 			]
 		];
-
-		if($miniMode != 'on'){
-			$fields['blocks'] = [
-				'type' => [
-					'list_of' => ['non_null' => 'Block']
-				],
-				'description' => __('Gutenberg blocks', 'wp-graphql-gutenberg'),
-				'resolve' => function ($model, $args, $context, $info) {
-					return Block::create_blocks(
-						parse_blocks(get_post($model->ID)->post_content),
-						$model->ID,
-						Registry::get_registry()
-					);
-				}
-			];
-			$fields['previewBlocks'] = [
-				'type' => [
-					'list_of' => ['non_null' => 'Block']
-				],
-				'description' => __('Previewed gutenberg blocks', 'wp-graphql-gutenberg'),
-				'resolve' => Utils::ensure_capability(
-					function ($model) {
-						$id = BlockEditorPreview::get_preview_id($model->ID, $model->ID);
-
-						if (!empty($id)) {
-							return Block::create_blocks(
-								parse_blocks(get_post($id)->post_content),
-								$id,
-								Registry::get_registry()
-							);
-						}
-
-						return null;
-					},
-					function ($cap) {
-						return $cap->edit_posts;
-					}
-				)
-			];
-		}
 
 		add_action('graphql_register_types', function ($type_registry) use ($fields) {
 			$this->type_registry = $type_registry;
