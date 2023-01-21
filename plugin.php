@@ -3,10 +3,10 @@
 /**
  * Plugin Name: WP GraphQL Blocks
  * Plugin URI: https://github.com/webdeveducation/wp-graphql-blocks
- * Description: Enable blocks in WP GraphQL. Based on wp-graphql-gutenberg by pristas-peter.
+ * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.1
+ * Version: 1.0.2
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
