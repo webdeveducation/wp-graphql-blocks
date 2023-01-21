@@ -6,109 +6,180 @@
  * Description: Enable blocks in WP GraphQL. Based on wp-graphql-gutenberg by pristas-peter.
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.0
+ * Version: 1.0.1
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
  */
 
-namespace WPGraphQLGutenberg;
-
-use WPGraphQLGutenberg\Blocks\Registry;
-
 if (!defined('ABSPATH')) {
 	die('Silence is golden.');
 }
 
-if (!class_exists('WPGraphQLGutenberg')) {
-	final class WPGraphQLGutenberg {
+if (!class_exists('WPGraphQLBlocks')) {
+
+  class Block {
+    public function __construct($data, $post_id) {
+      $this->name = $data['blockName'];
+
+      $attributes = $data['attrs'];
+
+      if($data['blockName'] == 'core/media-text'){
+        // get media item
+        $img = wp_get_attachment_image_src($attributes['mediaId'], 'full');
+        if($img){
+          $attributes['width'] = $img[1];
+          $attributes['height'] = $img[2];
+        }
+      }
+  
+      if($data['blockName'] == 'core/cover'){
+        if($attributes['useFeaturedImage']){
+          $attributes['id'] = get_post_thumbnail_id($post_id);
+          $attributes['url'] = get_the_post_thumbnail_url($post_id, 'full');
+        }
+        // get media item
+        $img = wp_get_attachment_image_src($attributes['id'], 'full');
+        if($img){
+          $attributes['width'] = $img[1];
+          $attributes['height'] = $img[2];
+        }
+      }
+  
+      if($data['blockName'] == 'core/post-title'){
+        $attributes['content'] = get_the_title($post_id) ?? "";
+      }
+  
+      if($data['blockName'] == 'core/image'){
+        if(!$attributes['height'] && !$attributes['width']){
+          // get media item
+          $img = wp_get_attachment_image_src($attributes['id'], 'full');
+          if($img){
+            $attributes['width'] = $img[1];
+            $attributes['height'] = $img[2];
+          }
+        }
+      }
+
+      $this->attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
+
+      $this->originalContent = preg_replace('/^\n|\n$/', '', $data['innerHTML']);
+      $dynamicContent = render_block($data);
+      if($this->$originalContent != $dynamicContent){
+        $this->dynamicContent = render_block($data);
+      }
+      $innerBlocks = [];
+      foreach($data['innerBlocks'] as $innerBlock){
+        $innerBlocks[] = new Block($innerBlock, $post_id);
+      }
+      $this->innerBlocks = $innerBlocks;
+      if($this->name == 'core/gallery'){
+        $classId = $this->get_core_gallery_class_id();
+        $this->inlineClassnames = $classId;
+        $this->inlineStylesheet = $this->get_core_gallery_stylesheet($classId);
+      }
+    }
+
+    private function get_core_gallery_class_id(){
+      $needle = "wp-block-gallery-";
+      $startPos = strpos($this->dynamicContent, $needle);
+      $endPos = strpos($this->dynamicContent, " ", $startPos);
+      $classId = substr($this->dynamicContent, $startPos, $endPos - $startPos);
+      return $classId;
+    }
+  
+    private function get_core_gallery_stylesheet($classId){		
+      $gap = _wp_array_get( $this->attributes, array( 'style', 'spacing', 'blockGap' ) );
+      // Skip if gap value contains unsupported characters.
+      // Regex for CSS value borrowed from `safecss_filter_attr`, and used here
+      // because we only want to match against the value, not the CSS attribute.
+      if ( is_array( $gap ) ) {
+        foreach ( $gap as $key => $value ) {
+          // Make sure $value is a string to avoid PHP 8.1 deprecation error in preg_match() when the value is null.
+          $value = is_string( $value ) ? $value : '';
+          $value = $value && preg_match( '%[\\\(&=}]|/\*%', $value ) ? null : $value;
+  
+          // Get spacing CSS variable from preset value if provided.
+          if ( is_string( $value ) && str_contains( $value, 'var:preset|spacing|' ) ) {
+            $index_to_splice = strrpos( $value, '|' ) + 1;
+            $slug            = _wp_to_kebab_case( substr( $value, $index_to_splice ) );
+            $value           = "var(--wp--preset--spacing--$slug)";
+          }
+  
+          $gap[ $key ] = $value;
+        }
+      } else {
+        // Make sure $gap is a string to avoid PHP 8.1 deprecation error in preg_match() when the value is null.
+        $gap = is_string( $gap ) ? $gap : '';
+        $gap = $gap && preg_match( '%[\\\(&=}]|/\*%', $gap ) ? null : $gap;
+  
+        // Get spacing CSS variable from preset value if provided.
+        if ( is_string( $gap ) && str_contains( $gap, 'var:preset|spacing|' ) ) {
+          $index_to_splice = strrpos( $gap, '|' ) + 1;
+          $slug            = _wp_to_kebab_case( substr( $gap, $index_to_splice ) );
+          $gap             = "var(--wp--preset--spacing--$slug)";
+        }
+      }
+  
+      // --gallery-block--gutter-size is deprecated. --wp--style--gallery-gap-default should be used by themes that want to set a default
+      // gap on the gallery.
+      $fallback_gap = 'var( --wp--style--gallery-gap-default, var( --gallery-block--gutter-size, var( --wp--style--block-gap, 0.5em ) ) )';
+      $gap_value    = $gap ? $gap : $fallback_gap;
+      $gap_column   = $gap_value;
+  
+      if ( is_array( $gap_value ) ) {
+        $gap_row    = isset( $gap_value['top'] ) ? $gap_value['top'] : $fallback_gap;
+        $gap_column = isset( $gap_value['left'] ) ? $gap_value['left'] : $fallback_gap;
+        $gap_value  = $gap_row === $gap_column ? $gap_row : $gap_row . ' ' . $gap_column;
+      }
+  
+      // The unstable gallery gap calculation requires a real value (such as `0px`) and not `0`.
+      if ( '0' === $gap_column ) {
+        $gap_column = '0px';
+      }
+  
+      // Set the CSS variable to the column value, and the `gap` property to the combined gap value.
+      $style = '.wp-block-gallery.' . $classId . '{ --wp--style--unstable-gallery-gap: ' . $gap_column . '; gap: ' . $gap_value . '}';
+      return $style;
+    }
+  }
+  
+	final class WPGraphQLBlocks {
 		private static $instance;
 		public static function instance() {
 			if (!isset(self::$instance)) {
-				self::$instance = new WPGraphQLGutenberg();
+				self::$instance = new WPGraphQLBlocks();
 			}
 
 			return self::$instance;
 		}
 
-		public $server;
-
-		private function setup_autoload() {
-			/**
-			 * WP_GATSBY_AUTOLOAD can be set to "false" to prevent the autoloader from running.
-			 * In most cases, this is not something that should be disabled, but some environments
-			 * may bootstrap their dependencies in a global autoloader that will autoload files
-			 * before we get to this point, and requiring the autoloader again can trigger fatal errors.
-			 *
-			 * The codeception tests are an example of an environment where adding the autoloader again causes issues
-			 * so this is set to false for tests.
-			 */
-			if (defined('WP_GRAPHQL_GUTENBERG_AUTOLOAD') && true === WP_GRAPHQL_GUTENBERG_AUTOLOAD) {
-				// Autoload Required Classes.
-				include_once WP_GRAPHQL_GUTENBERG_PLUGIN_DIR . 'vendor/autoload.php';
-			}
-		}
-
-		private function setup_constants() {
-			// // Plugin version.
-			if (!defined('WP_GRAPHQL_GUTENBERG_VERSION')) {
-				define('WP_GRAPHQL_GUTENBERG_VERSION', '1.0.0');
-			}
-
-			// Plugin Folder Path.
-			if (!defined('WP_GRAPHQL_GUTENBERG_PLUGIN_DIR')) {
-				define('WP_GRAPHQL_GUTENBERG_PLUGIN_DIR', plugin_dir_path(__FILE__));
-			}
-
-			// Plugin Folder URL.
-			if (!defined('WP_GRAPHQL_GUTENBERG_PLUGIN_URL')) {
-				define('WP_GRAPHQL_GUTENBERG_PLUGIN_URL', plugin_dir_url(__FILE__));
-			}
-
-			// Plugin Root File.
-			if (!defined('WP_GRAPHQL_GUTENBERG_PLUGIN_FILE')) {
-				define('WP_GRAPHQL_GUTENBERG_PLUGIN_FILE', __FILE__);
-			}
-
-			// Whether to autoload the files or not.
-			if (!defined('WP_GRAPHQL_GUTENBERG_AUTOLOAD')) {
-				define('WP_GRAPHQL_GUTENBERG_AUTOLOAD', true);
-			}
-
-			// Whether to run the plugin in debug mode. Default is false.
-			if (!defined('WP_GRAPHQL_GUTENBERG_DEBUG')) {
-				define('WP_GRAPHQL_GUTENBERG_DEBUG', false);
-			}
-		}
-
 		public function init() {
-			$this->setup_constants();
-			$this->setup_autoload();
-
-			new \WPGraphQLGutenberg\PostTypes\ReusableBlock();
-			new \WPGraphQLGutenberg\PostTypes\BlockEditorPreview();
-			new \WPGraphQLGutenberg\Admin\Editor();
-			new \WPGraphQLGutenberg\Admin\Settings();
-			new \WPGraphQLGutenberg\Rest\Rest();
-
-			add_action('init_graphql_request', function () {
-				new \WPGraphQLGutenberg\Schema\Schema();
-				$this->server = new \WPGraphQLGutenberg\Server\Server();
-			});
-
-			add_filter('graphql_request_data', function ($request_data) {
-				if ($this->server->enabled() && $this->server->gutenberg_fields_in_query($request_data['query'])) {
-					Registry::update_registry(Registry::normalize($this->server->get_block_types()));
-				}
-
-				return $request_data;
-			});
-
-			register_deactivation_hook(__FILE__, function () {
-				\WPGraphQLGutenberg\Server\Server::cleanup();
-			});
+      add_action( 'graphql_register_types', function() {
+        register_graphql_scalar('JSON', [
+          'serialize' => function ($value) {
+            return json_decode($value);
+          }
+        ]);
+        
+        register_graphql_field( 'ContentNode', 'blocks', [
+          'type' => 'JSON',
+          'description' => __( 'Returns all blocks as a JSON object', 'wp-graphql-blocks' ),
+          'resolve' => function( \WPGraphQL\Model\Post $post, $args, $context, $info ) {
+            $blocks = parse_blocks(get_post($post->databaseId)->post_content);
+            $mappedBlocks = [];
+            foreach($blocks as $block){
+              $mappedBlocks[] = new Block($block, $post->databaseId);
+            }
+  
+            return wp_json_encode($mappedBlocks);
+          }
+        ] );
+      });
 		}
 	}
 }
 
-WPGraphQLGutenberg::instance()->init();
+WPGraphQLBlocks::instance()->init();
+
+?>
