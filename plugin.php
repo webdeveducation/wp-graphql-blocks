@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.2
+ * Version: 1.0.3
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -64,10 +64,11 @@ if (!class_exists('WPGraphQLBlocks')) {
       $this->attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
 
       $this->originalContent = preg_replace('/^\n|\n$/', '', $data['innerHTML']);
-      $dynamicContent = render_block($data);
-      if($this->$originalContent != $dynamicContent){
-        $this->dynamicContent = render_block($data);
+      $dynamicContent = preg_replace('/^\n|\n$/', '', render_block($data));
+      if($this->originalContent != $dynamicContent){
+        $this->dynamicContent = $dynamicContent;
       }
+
       $innerBlocks = [];
       foreach($data['innerBlocks'] as $innerBlock){
         $innerBlocks[] = new Block($innerBlock, $post_id);
@@ -166,10 +167,10 @@ if (!class_exists('WPGraphQLBlocks')) {
           'type' => 'JSON',
           'description' => __( 'Returns all blocks as a JSON object', 'wp-graphql-blocks' ),
           'resolve' => function( \WPGraphQL\Model\Post $post, $args, $context, $info ) {
-            $blocks = parse_blocks(get_post($post->databaseId)->post_content);
+            $blocks = parse_blocks(get_post($post->ID)->post_content);
             $mappedBlocks = [];
             foreach($blocks as $block){
-              $mappedBlocks[] = new Block($block, $post->databaseId);
+              $mappedBlocks[] = new Block($block, $post->ID);
             }
   
             return wp_json_encode($mappedBlocks);
