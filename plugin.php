@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.4
+ * Version: 1.0.5
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -61,13 +61,20 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
-      $this->attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
-
       $this->originalContent = preg_replace('/^\n|\n$/', '', $data['innerHTML']);
       $dynamicContent = preg_replace('/^\n|\n$/', '', render_block($data));
       if($this->originalContent != $dynamicContent){
         $this->dynamicContent = $dynamicContent;
       }
+
+      if($data['blockName'] == 'core/paragraph'){
+        $attributes['content'] = substr($this->originalContent, 3, -4);
+      }
+      if($data['blockName'] == 'core/heading'){
+        $attributes['content'] = substr($this->originalContent, 4, -5);
+      }
+
+      $this->attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
 
       $innerBlocks = [];
       foreach($data['innerBlocks'] as $innerBlock){
@@ -79,6 +86,8 @@ if (!class_exists('WPGraphQLBlocks')) {
         $this->inlineClassnames = $classId;
         $this->inlineStylesheet = $this->get_core_gallery_stylesheet($classId);
       }
+
+      
     }
 
     private function get_core_gallery_class_id(){
@@ -170,9 +179,10 @@ if (!class_exists('WPGraphQLBlocks')) {
             $blocks = parse_blocks(get_post($post->ID)->post_content);
             $mappedBlocks = [];
             foreach($blocks as $block){
-              $mappedBlocks[] = new Block($block, $post->ID);
+              if(isset($block['blockName'])){
+                $mappedBlocks[] = new Block($block, $post->ID);
+              }
             }
-  
             return wp_json_encode($mappedBlocks);
           }
         ] );
