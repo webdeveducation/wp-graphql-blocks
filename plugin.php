@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.5
+ * Version: 1.0.6
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -55,6 +55,7 @@ if (!class_exists('WPGraphQLBlocks')) {
           // get media item
           $img = wp_get_attachment_image_src($attributes['id'], 'full');
           if($img){
+            $attributes['url'] = $img[0];
             $attributes['width'] = $img[1];
             $attributes['height'] = $img[2];
           }
@@ -68,10 +69,10 @@ if (!class_exists('WPGraphQLBlocks')) {
       }
 
       if($data['blockName'] == 'core/paragraph'){
-        $attributes['content'] = substr($this->originalContent, 3, -4);
+        $attributes['content'] = substr($this->originalContent, strpos($this->originalContent, ">") + 1, -4);
       }
       if($data['blockName'] == 'core/heading'){
-        $attributes['content'] = substr($this->originalContent, 4, -5);
+        $attributes['content'] = substr($this->originalContent, strpos($this->originalContent, ">") + 1, -5);
       }
 
       $this->attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
