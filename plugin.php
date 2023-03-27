@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.6
+ * Version: 1.0.7
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -77,18 +77,29 @@ if (!class_exists('WPGraphQLBlocks')) {
 
       $this->attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
 
+      $innerBlocksRaw = $data['innerBlocks'];
+
+		  // handle mapping reusable blocks to innerBlocks.
+		  if ($data['blockName'] === 'core/block' && !empty($data['attrs']['ref'])) {
+			  $ref = $data['attrs']['ref'];
+				$reusablePost = get_post($ref);
+	
+        if (!empty($reusablePost)) {
+          $innerBlocksRaw = parse_blocks($reusablePost->post_content);
+        }
+      }
+
       $innerBlocks = [];
-      foreach($data['innerBlocks'] as $innerBlock){
+      foreach($innerBlocksRaw as $innerBlock){
         $innerBlocks[] = new Block($innerBlock, $post_id);
       }
       $this->innerBlocks = $innerBlocks;
+
       if($this->name == 'core/gallery'){
         $classId = $this->get_core_gallery_class_id();
         $this->inlineClassnames = $classId;
         $this->inlineStylesheet = $this->get_core_gallery_stylesheet($classId);
       }
-
-      
     }
 
     private function get_core_gallery_class_id(){
