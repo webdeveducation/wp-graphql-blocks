@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.8
+ * Version: 1.0.9
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -72,7 +72,19 @@ if (!class_exists('WPGraphQLBlocks')) {
         $attributes['content'] = substr($this->originalContent, strpos($this->originalContent, ">") + 1, -4);
       }
       if($data['blockName'] == 'core/heading'){
+        // level assumes that if there's no value set for this attributes, then it's default value is 2
+        // so we need to make sure this is reflected in the attributes
+        if(!isset($attributes['level'])){
+          $attributes['level'] = 2;
+        }
         $attributes['content'] = substr($this->originalContent, strpos($this->originalContent, ">") + 1, -5);
+      }
+      if($data['blockName'] == 'core/columns'){
+        // isStackedOnMobile ASSUMES THAT IF THERE'S NO VALUE SET FOR THIS ATTRIBUTE, THEN IT IS SWITCHED ON BY DEFAULT
+        // so we need to make sure this is reflected in the attributes
+        if(!isset($attributes['isStackedOnMobile'])){
+          $attributes['isStackedOnMobile'] = true;
+        }
       }
 
       $this->attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
