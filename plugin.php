@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.9
+ * Version: 1.0.10
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -84,6 +84,13 @@ if (!class_exists('WPGraphQLBlocks')) {
         // so we need to make sure this is reflected in the attributes
         if(!isset($attributes['isStackedOnMobile'])){
           $attributes['isStackedOnMobile'] = true;
+        }
+      }
+      if($data['blockName'] == 'core/gallery'){
+        // imageCrop ASSUMES THAT IF THERE'S NO VALUE SET FOR THIS ATTRIBUTE, THEN IT IS SWITCHED ON BY DEFAULT
+        // so we need to make sure this is reflected in the attributes
+        if(!isset($attributes['imageCrop'])){
+          $attributes['imageCrop'] = true;
         }
       }
 
