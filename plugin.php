@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.10
+ * Version: 1.0.11
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -68,6 +68,28 @@ if (!class_exists('WPGraphQLBlocks')) {
         $this->dynamicContent = $dynamicContent;
       }
 
+      if($data['blockName'] == 'core/button'){
+        // if button has anchor tag
+        if(str_contains($this->originalContent, "<a")){
+          $firstPartOfAnchor = substr($this->originalContent, strpos($this->originalContent, "<a"));
+          $completeAnchor = substr($firstPartOfAnchor, 0, strpos($firstPartOfAnchor, "</a>") + 4 - strlen($firstPartOfAnchor));
+          $openingAnchorTag = substr($completeAnchor, 0, strpos($completeAnchor, ">") - strlen($completeAnchor));
+          //wp_send_json($openingAnchorTag);
+          if(str_contains($openingAnchorTag, "rel=")){
+            $firstPartRel = substr($openingAnchorTag, strpos($openingAnchorTag, "rel=\"") + 5);
+            $completeRel = substr($firstPartRel, 0, strpos($firstPartRel, "\"") - strlen($firstPartRel));
+            $attributes['rel'] = $completeRel;
+          }
+          if(str_contains($openingAnchorTag, "target=")){
+            $firstPartTarget = substr($openingAnchorTag, strpos($openingAnchorTag, "target=\"") + 8);
+            $completeTarget = substr($firstPartTarget, 0, strpos($firstPartTarget, "\"") - strlen($firstPartTarget));
+            $attributes['target'] = $completeTarget;
+          }
+          $firstPartUrl = substr($openingAnchorTag, strpos($openingAnchorTag, "href=\"") + 6);
+          $completeUrl = substr($firstPartUrl, 0, strpos($firstPartUrl, "\"") - strlen($firstPartUrl));
+          $attributes['url'] = $completeUrl;
+        }
+      }
       if($data['blockName'] == 'core/paragraph'){
         $attributes['content'] = substr($this->originalContent, strpos($this->originalContent, ">") + 1, -4);
       }
