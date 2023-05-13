@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.11
+ * Version: 1.0.12
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -64,14 +64,6 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
-      /*$this->originalContent = preg_replace('/^\n|\n$/', '', $data['innerHTML']);
-      $dynamicContent = preg_replace('/^\n|\n$/', '', render_block($data));
-      if($this->originalContent != $dynamicContent){
-        $this->dynamicContent = $dynamicContent;
-      }*/
-
-      //wp_send_json(getPageHTML($post_id));
-
       $blockString = render_block($data);
       $this->htmlContent = str_replace("\n", "", $blockString);
 
@@ -80,25 +72,33 @@ if (!class_exists('WPGraphQLBlocks')) {
       }
 
       if($data['blockName'] == 'core/button'){
-        // if button has anchor tag
-        if(str_contains($this->htmlContent, "<a")){
-          /*$firstPartOfAnchor = substr($this->htmlContent, strpos($this->originalContent, "<a"));
-          $completeAnchor = substr($firstPartOfAnchor, 0, strpos($firstPartOfAnchor, "</a>") + 4 - strlen($firstPartOfAnchor));
-          $openingAnchorTag = substr($completeAnchor, 0, strpos($completeAnchor, ">") - strlen($completeAnchor));
-          //wp_send_json($openingAnchorTag);
-          if(str_contains($openingAnchorTag, "rel=")){
-            $firstPartRel = substr($openingAnchorTag, strpos($openingAnchorTag, "rel=\"") + 5);
-            $completeRel = substr($firstPartRel, 0, strpos($firstPartRel, "\"") - strlen($firstPartRel));
-            $attributes['rel'] = $completeRel;
+        $dom = new \DOMDocument();
+        $html = $this->htmlContent;
+        $htmlString = "<html><body>" . $html . "</body></html>";
+        $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $aElements = $dom->getElementsByTagName('a');
+        if($aElements->length){
+          $aElement = $aElements->item(0);
+          $innerHTML = '';
+          foreach ($aElement->childNodes as $child) {
+            $innerHTML .= $dom->saveHTML($child);
           }
-          if(str_contains($openingAnchorTag, "target=")){
-            $firstPartTarget = substr($openingAnchorTag, strpos($openingAnchorTag, "target=\"") + 8);
-            $completeTarget = substr($firstPartTarget, 0, strpos($firstPartTarget, "\"") - strlen($firstPartTarget));
-            $attributes['target'] = $completeTarget;
+          unset($dom);
+          $linkAttribute = $aElement->getAttribute('target');
+          $hrefAttribute = $aElement->getAttribute('href');
+          $relAttribute = $aElement->getAttribute('rel');
+          if(isset($linkAttribute)){
+            $attributes['linkTarget'] = $linkAttribute;
           }
-          $firstPartUrl = substr($openingAnchorTag, strpos($openingAnchorTag, "href=\"") + 6);
-          $completeUrl = substr($firstPartUrl, 0, strpos($firstPartUrl, "\"") - strlen($firstPartUrl));
-          $attributes['url'] = $completeUrl;*/
+          if(isset($innerHTML)){
+            $attributes['text'] = $innerHTML;
+          }
+          if(isset($hrefAttribute)){
+            $attributes['url'] = $hrefAttribute;
+          }
+          if(isset($relAttribute)){
+            $attributes['rel'] = $relAttribute;
+          }
         }
       }
       if($data['blockName'] == 'core/paragraph'){
@@ -109,6 +109,7 @@ if (!class_exists('WPGraphQLBlocks')) {
         // so we need to make sure this is reflected in the attributes
         if(!isset($attributes['level'])){
           $attributes['level'] = 2;
+
         }
         $attributes['content'] = substr($this->htmlContent, strpos($this->htmlContent, ">") + 1, -5);
       }
@@ -156,9 +157,9 @@ if (!class_exists('WPGraphQLBlocks')) {
 
     private function get_core_gallery_class_id(){
       $needle = "wp-block-gallery-";
-      $startPos = strpos($this->dynamicContent, $needle);
-      $endPos = strpos($this->dynamicContent, " ", $startPos);
-      $classId = substr($this->dynamicContent, $startPos, $endPos - $startPos);
+      $startPos = strpos($this->htmlContent, $needle);
+      $endPos = strpos($this->htmlContent, " ", $startPos);
+      $classId = substr($this->htmlContent, $startPos, $endPos - $startPos);
       return $classId;
     }
 
