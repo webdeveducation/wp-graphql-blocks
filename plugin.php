@@ -19,12 +19,10 @@ if (!defined('ABSPATH')) {
 if (!class_exists('WPGraphQLBlocks')) {
 
   class Block {
-    public function __construct($data, $post_id) {
+    public function __construct($data, $post_id, $args) {
       $this->name = $data['blockName'];
 
       $attributes = $data['attrs'];
-
-      
 
       if($data['blockName'] == 'core/media-text'){
         // get media item
@@ -65,15 +63,20 @@ if (!class_exists('WPGraphQLBlocks')) {
       }
 
       $blockString = render_block($data);
-      $this->htmlContent = str_replace("\n", "", $blockString);
+      $originalContent = str_replace("\n", "", $data['innerHTML']);
+      $dynamicContent = str_replace("\n", "", $blockString);
+      $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
+      if($args['htmlContent'] && $htmlContent){
+        $this->htmlContent = $htmlContent;
+      }
 
       if($data['blockName'] == 'core/table'){
-        wp_send_json($this->htmlContent);
+        //wp_send_json($this->htmlContent);
       }
 
       if($data['blockName'] == 'core/button'){
         $dom = new \DOMDocument();
-        $html = $this->htmlContent;
+        $html = $htmlContent;
         $htmlString = "<html><body>" . $html . "</body></html>";
         $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         $aElements = $dom->getElementsByTagName('a');
@@ -102,7 +105,7 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
       if($data['blockName'] == 'core/paragraph'){
-        $attributes['content'] = substr($this->htmlContent, strpos($this->htmlContent, ">") + 1, -4);
+        $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -4);
       }
       if($data['blockName'] == 'core/heading'){
         // level assumes that if there's no value set for this attributes, then it's default value is 2
@@ -111,7 +114,7 @@ if (!class_exists('WPGraphQLBlocks')) {
           $attributes['level'] = 2;
 
         }
-        $attributes['content'] = substr($this->htmlContent, strpos($this->htmlContent, ">") + 1, -5);
+        $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -5);
       }
       if($data['blockName'] == 'core/columns'){
         // isStackedOnMobile ASSUMES THAT IF THERE'S NO VALUE SET FOR THIS ATTRIBUTE, THEN IT IS SWITCHED ON BY DEFAULT
@@ -128,7 +131,10 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
-      $this->attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
+      $attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
+      if($args['attributes'] && $attributes){
+        $this->attributes = $attributes;
+      }
 
       $innerBlocksRaw = $data['innerBlocks'];
 
@@ -144,22 +150,24 @@ if (!class_exists('WPGraphQLBlocks')) {
 
       $innerBlocks = [];
       foreach($innerBlocksRaw as $innerBlock){
-        $innerBlocks[] = new Block($innerBlock, $post_id);
+        $innerBlocks[] = new Block($innerBlock, $post_id, $args);
       }
-      $this->innerBlocks = $innerBlocks;
+      if($args['innerBlocks'] && $innerBlocks){
+        $this->innerBlocks = $innerBlocks;
+      }
 
       if($this->name == 'core/gallery'){
-        $classId = $this->get_core_gallery_class_id();
+        $classId = $this->get_core_gallery_class_id($htmlContent);
         $this->inlineClassnames = $classId;
-        $this->inlineStylesheet = $this->get_core_gallery_stylesheet($classId);
+        $this->inlineStylesheet = $this->get_core_gallery_stylesheet($classId, $attributes);
       }
     }
 
-    private function get_core_gallery_class_id(){
+    private function get_core_gallery_class_id($htmlContent){
       $needle = "wp-block-gallery-";
-      $startPos = strpos($this->htmlContent, $needle);
-      $endPos = strpos($this->htmlContent, " ", $startPos);
-      $classId = substr($this->htmlContent, $startPos, $endPos - $startPos);
+      $startPos = strpos($htmlContent, $needle);
+      $endPos = strpos($htmlContent, " ", $startPos);
+      $classId = substr($htmlContent, $startPos, $endPos - $startPos);
       return $classId;
     }
 
@@ -180,8 +188,8 @@ if (!class_exists('WPGraphQLBlocks')) {
       return $html;
     }
   
-    private function get_core_gallery_stylesheet($classId){		
-      $gap = _wp_array_get( $this->attributes, array( 'style', 'spacing', 'blockGap' ) );
+    private function get_core_gallery_stylesheet($classId, $attributes){		
+      $gap = _wp_array_get( $attributes, array( 'style', 'spacing', 'blockGap' ) );
       // Skip if gap value contains unsupported characters.
       // Regex for CSS value borrowed from `safecss_filter_attr`, and used here
       // because we only want to match against the value, not the CSS attribute.
@@ -256,13 +264,36 @@ if (!class_exists('WPGraphQLBlocks')) {
         
         register_graphql_field( 'ContentNode', 'blocks', [
           'type' => 'JSON',
+          'args' => [
+            'htmlContent' => [
+              'type' => 'Boolean',
+              'description' => 'Whether to return the htmlContent for each block',
+              'defaultValue' => true,
+            ],
+            'attributes' => [
+              'type' => 'Boolean',
+              'description' => 'Whether to return the attributes for each block',
+              'defaultValue' => true,
+            ],
+            'name' => [
+              'type' => 'Boolean',
+              'description' => 'Whether to return the name for each block',
+              'defaultValue' => true,
+            ],
+            'innerBlocks' => [
+              'type' => 'Boolean',
+              'description' => 'Whether to return the innerBlocks for each block',
+              'defaultValue' => true,
+            ],
+          ],
           'description' => __( 'Returns all blocks as a JSON object', 'wp-graphql-blocks' ),
           'resolve' => function( \WPGraphQL\Model\Post $post, $args, $context, $info ) {
             $blocks = parse_blocks(get_post($post->ID)->post_content);
+            //wp_send_json($args);
             $mappedBlocks = [];
             foreach($blocks as $block){
               if(isset($block['blockName'])){
-                $mappedBlocks[] = new Block($block, $post->ID);
+                $mappedBlocks[] = new Block($block, $post->ID, $args);
               }
             }
             return wp_json_encode($mappedBlocks);
