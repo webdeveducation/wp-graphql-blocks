@@ -24,6 +24,8 @@ if (!class_exists('WPGraphQLBlocks')) {
 
       $attributes = $data['attrs'];
 
+      
+
       if($data['blockName'] == 'core/media-text'){
         // get media item
         $img = wp_get_attachment_image_src($attributes['mediaId'], 'full');
@@ -62,16 +64,25 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
-      $this->originalContent = preg_replace('/^\n|\n$/', '', $data['innerHTML']);
+      /*$this->originalContent = preg_replace('/^\n|\n$/', '', $data['innerHTML']);
       $dynamicContent = preg_replace('/^\n|\n$/', '', render_block($data));
       if($this->originalContent != $dynamicContent){
         $this->dynamicContent = $dynamicContent;
+      }*/
+
+      //wp_send_json(getPageHTML($post_id));
+
+      $blockString = render_block($data);
+      $this->htmlContent = str_replace("\n", "", $blockString);
+
+      if($data['blockName'] == 'core/table'){
+        wp_send_json($this->htmlContent);
       }
 
       if($data['blockName'] == 'core/button'){
         // if button has anchor tag
-        if(str_contains($this->originalContent, "<a")){
-          $firstPartOfAnchor = substr($this->originalContent, strpos($this->originalContent, "<a"));
+        if(str_contains($this->htmlContent, "<a")){
+          /*$firstPartOfAnchor = substr($this->htmlContent, strpos($this->originalContent, "<a"));
           $completeAnchor = substr($firstPartOfAnchor, 0, strpos($firstPartOfAnchor, "</a>") + 4 - strlen($firstPartOfAnchor));
           $openingAnchorTag = substr($completeAnchor, 0, strpos($completeAnchor, ">") - strlen($completeAnchor));
           //wp_send_json($openingAnchorTag);
@@ -87,11 +98,11 @@ if (!class_exists('WPGraphQLBlocks')) {
           }
           $firstPartUrl = substr($openingAnchorTag, strpos($openingAnchorTag, "href=\"") + 6);
           $completeUrl = substr($firstPartUrl, 0, strpos($firstPartUrl, "\"") - strlen($firstPartUrl));
-          $attributes['url'] = $completeUrl;
+          $attributes['url'] = $completeUrl;*/
         }
       }
       if($data['blockName'] == 'core/paragraph'){
-        $attributes['content'] = substr($this->originalContent, strpos($this->originalContent, ">") + 1, -4);
+        $attributes['content'] = substr($this->htmlContent, strpos($this->htmlContent, ">") + 1, -4);
       }
       if($data['blockName'] == 'core/heading'){
         // level assumes that if there's no value set for this attributes, then it's default value is 2
@@ -99,7 +110,7 @@ if (!class_exists('WPGraphQLBlocks')) {
         if(!isset($attributes['level'])){
           $attributes['level'] = 2;
         }
-        $attributes['content'] = substr($this->originalContent, strpos($this->originalContent, ">") + 1, -5);
+        $attributes['content'] = substr($this->htmlContent, strpos($this->htmlContent, ">") + 1, -5);
       }
       if($data['blockName'] == 'core/columns'){
         // isStackedOnMobile ASSUMES THAT IF THERE'S NO VALUE SET FOR THIS ATTRIBUTE, THEN IT IS SWITCHED ON BY DEFAULT
@@ -149,6 +160,23 @@ if (!class_exists('WPGraphQLBlocks')) {
       $endPos = strpos($this->dynamicContent, " ", $startPos);
       $classId = substr($this->dynamicContent, $startPos, $endPos - $startPos);
       return $classId;
+    }
+
+    private function getPageHTML($post_id){
+      // Start output buffering
+      ob_start();
+
+      // Load the page template
+      include( get_page_template($page_id) );
+
+      // Get the contents of the output buffer
+      $html = ob_get_contents();
+
+      // Clean up the output buffer
+      ob_end_clean();
+
+      // The $html variable now contains the compiled HTML of the page, including the head tag
+      return $html;
     }
   
     private function get_core_gallery_stylesheet($classId){		
