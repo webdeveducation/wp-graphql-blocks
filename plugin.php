@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.12
+ * Version: 2.0.0
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -65,45 +65,17 @@ if (!class_exists('WPGraphQLBlocks')) {
       $blockString = render_block($data);
       $originalContent = str_replace("\n", "", $data['innerHTML']);
       $dynamicContent = str_replace("\n", "", $blockString);
-      $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
+      $htmlContent = $originalContent ? $originalContent : $dynamicContent;
       if($args['htmlContent'] && $htmlContent){
         $this->htmlContent = $htmlContent;
       }
 
+      // MOVE THESE TO FRONT END
+      /*
       if($data['blockName'] == 'core/table'){
-        //wp_send_json($this->htmlContent);
+
       }
 
-      if($data['blockName'] == 'core/button'){
-        $dom = new \DOMDocument();
-        $html = $htmlContent;
-        $htmlString = "<html><body>" . $html . "</body></html>";
-        $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        $aElements = $dom->getElementsByTagName('a');
-        if($aElements->length){
-          $aElement = $aElements->item(0);
-          $innerHTML = '';
-          foreach ($aElement->childNodes as $child) {
-            $innerHTML .= $dom->saveHTML($child);
-          }
-          unset($dom);
-          $linkAttribute = $aElement->getAttribute('target');
-          $hrefAttribute = $aElement->getAttribute('href');
-          $relAttribute = $aElement->getAttribute('rel');
-          if(isset($linkAttribute)){
-            $attributes['linkTarget'] = $linkAttribute;
-          }
-          if(isset($innerHTML)){
-            $attributes['text'] = $innerHTML;
-          }
-          if(isset($hrefAttribute)){
-            $attributes['url'] = $hrefAttribute;
-          }
-          if(isset($relAttribute)){
-            $attributes['rel'] = $relAttribute;
-          }
-        }
-      }
       if($data['blockName'] == 'core/paragraph'){
         $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -4);
       }
@@ -112,7 +84,6 @@ if (!class_exists('WPGraphQLBlocks')) {
         // so we need to make sure this is reflected in the attributes
         if(!isset($attributes['level'])){
           $attributes['level'] = 2;
-
         }
         $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -5);
       }
@@ -129,7 +100,7 @@ if (!class_exists('WPGraphQLBlocks')) {
         if(!isset($attributes['imageCrop'])){
           $attributes['imageCrop'] = true;
         }
-      }
+      }*/
 
       $attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
       if($args['attributes'] && $attributes){
@@ -169,23 +140,6 @@ if (!class_exists('WPGraphQLBlocks')) {
       $endPos = strpos($htmlContent, " ", $startPos);
       $classId = substr($htmlContent, $startPos, $endPos - $startPos);
       return $classId;
-    }
-
-    private function getPageHTML($post_id){
-      // Start output buffering
-      ob_start();
-
-      // Load the page template
-      include( get_page_template($page_id) );
-
-      // Get the contents of the output buffer
-      $html = ob_get_contents();
-
-      // Clean up the output buffer
-      ob_end_clean();
-
-      // The $html variable now contains the compiled HTML of the page, including the head tag
-      return $html;
     }
   
     private function get_core_gallery_stylesheet($classId, $attributes){		
