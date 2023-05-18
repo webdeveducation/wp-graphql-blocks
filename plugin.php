@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 1.0.12
+ * Version: 1.0.13
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -49,6 +49,12 @@ if (!class_exists('WPGraphQLBlocks')) {
       if($data['blockName'] == 'core/post-title'){
         $attributes['content'] = get_the_title($post_id) ?? "";
       }
+
+      $this->originalContent = preg_replace('/^\n|\n$/', '', $data['innerHTML']);
+      $dynamicContent = preg_replace('/^\n|\n$/', '', render_block($data));
+      if($this->originalContent != $dynamicContent){
+        $this->dynamicContent = $dynamicContent;
+      }
   
       if($data['blockName'] == 'core/image'){
         if(!$attributes['height'] && !$attributes['width']){
@@ -60,12 +66,28 @@ if (!class_exists('WPGraphQLBlocks')) {
             $attributes['height'] = $img[2];
           }
         }
-      }
-
-      $this->originalContent = preg_replace('/^\n|\n$/', '', $data['innerHTML']);
-      $dynamicContent = preg_replace('/^\n|\n$/', '', render_block($data));
-      if($this->originalContent != $dynamicContent){
-        $this->dynamicContent = $dynamicContent;
+        // get link
+        $dom = new \DOMDocument();
+        $html = $this->originalContent ?? $this->dynamicContent;
+        $htmlString = "<html><body>" . $html . "</body></html>";
+        $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $aElements = $dom->getElementsByTagName('a');
+        if($aElements->length){
+          $aElement = $aElements->item(0);
+          unset($dom);
+          $linkAttribute = $aElement->getAttribute('target');
+          $hrefAttribute = $aElement->getAttribute('href');
+          $relAttribute = $aElement->getAttribute('rel');
+          if(isset($linkAttribute)){
+            $attributes['linkTarget'] = $linkAttribute;
+          }
+          if(isset($hrefAttribute)){
+            $attributes['href'] = $hrefAttribute;
+          }
+          if(isset($relAttribute)){
+            $attributes['rel'] = $relAttribute;
+          }
+        }
       }
 
       if($data['blockName'] == 'core/button'){
