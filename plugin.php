@@ -65,7 +65,7 @@ if (!class_exists('WPGraphQLBlocks')) {
       $blockString = render_block($data);
       $originalContent = str_replace("\n", "", $data['innerHTML']);
       $dynamicContent = str_replace("\n", "", $blockString);
-      $htmlContent = $originalContent ? $originalContent : $dynamicContent;
+      $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
       if($args['htmlContent'] && $htmlContent){
         $this->htmlContent = $htmlContent;
       }
@@ -243,7 +243,20 @@ if (!class_exists('WPGraphQLBlocks')) {
           'description' => __( 'Returns all blocks as a JSON object', 'wp-graphql-blocks' ),
           'resolve' => function( \WPGraphQL\Model\Post $post, $args, $context, $info ) {
             $blocks = parse_blocks(get_post($post->ID)->post_content);
-            //wp_send_json($args);
+            $templateName = $post->template['templateName'];
+            // get template
+
+            // first get from wp_postsmeta, where post_id === $post->ID && meta_key === _wp_page_template
+            // if exists, then get the meta_value (i.e. "single-sidebar")
+            // use the meta_value in a new query to query the wp_posts table where post_name === meta_value && post_type === "wp_template"
+
+            /*
+            need to get all templates from /templates directory.
+            this applies to this theme (which may be a child theme),
+            so if this is a child theme, also need to get all templates
+            from the /templates directory of the parent theme
+            */
+
             $mappedBlocks = [];
             foreach($blocks as $block){
               if(isset($block['blockName'])){
