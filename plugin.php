@@ -65,14 +65,6 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
-      $blockString = render_block($data);
-      $originalContent = str_replace("\n", "", $data['innerHTML']);
-      $dynamicContent = str_replace("\n", "", $blockString);
-      $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
-      if($args['htmlContent'] && $htmlContent){
-        $this->htmlContent = $htmlContent;
-      }
-
       // MOVE THESE TO FRONT END
       /*
       if($data['blockName'] == 'core/table'){
@@ -116,6 +108,43 @@ if (!class_exists('WPGraphQLBlocks')) {
         $innerBlocksRaw = parse_blocks($post_content);
       }
 
+      // handle template-parts
+      if($data['blockName'] === 'core/template-part' && !empty($data['attrs']['slug'])){
+        // load file from /parts
+        // this is just a normal page, get the default page template
+        $file_content = file_get_contents(get_stylesheet_directory() . "/parts/" . $data['attrs']['slug'] . ".html");
+        if($file_content){
+          $innerBlocksRaw = parse_blocks($file_content);
+        }else{
+          $file_content = file_get_contents(get_template_directory() . "/parts/" . $data['attrs']['slug'] . ".html");
+          if($file_content){
+            $innerBlocksRaw = parse_blocks($file_content);
+          }
+        }
+      }
+
+      // handle core/pattern
+      if($data['blockName'] === 'core/pattern' && !empty($data['attrs']['slug'])){
+        $block_pattern_slug = $data['attrs']['slug'];
+        $registered_block_patterns = \WP_Block_Patterns_Registry::get_instance()->get_all_registered();
+
+        // Find the block pattern by slug
+        $block_pattern = null;
+        foreach ($registered_block_patterns as $pattern) {
+          if ($pattern['name'] === $block_pattern_slug) {
+            $block_pattern = $pattern;
+            break;
+          }
+        }
+
+        if ($block_pattern) {
+          // Retrieve the content/markup of the block pattern
+          $block_pattern_content = $block_pattern['content'];
+          $innerBlocksRaw = parse_blocks($block_pattern_content);
+          //wp_send_json($innerBlocksRaw);
+        }        
+      }
+
 		  // handle mapping reusable blocks to innerBlocks.
 		  if ($data['blockName'] === 'core/block' && !empty($data['attrs']['ref'])) {
 			  $ref = $data['attrs']['ref'];
@@ -130,7 +159,44 @@ if (!class_exists('WPGraphQLBlocks')) {
       foreach($innerBlocksRaw as $innerBlock){
         $innerBlocks[] = new Block($innerBlock, $post_id, $post_content, $args);
       }
-      if($args['innerBlocks'] && $innerBlocks){
+
+      $blockString = render_block($data);
+      $originalContent = str_replace("\n", "", $data['innerHTML']);
+      $dynamicContent = str_replace("\n", "", $blockString);
+      $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
+      if($args['htmlContent'] && $htmlContent && $data['blockName'] !== "core/pattern"){
+        // if not core/cover, core/media-text, and has inner blocks, gut
+        // out the inner html from the top level tag, as it's not needed
+        if($data['blockName'] != 'core/cover' && $data['blockName'] != 'core/media-text' && count($innerBlocks)){
+          $dom = new \DOMDocument();
+          $htmlString = "<html><body>" . $htmlContent . "</body></html>";
+          $htmlString = str_replace("\n", "", $htmlString);
+          $htmlString = str_replace("\r", "", $htmlString);
+          $htmlString = str_replace("\t", "", $htmlString);
+          $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+          $bodyElement = $dom->getElementsByTagName('body')->item(0);
+          $topLevelElement = $bodyElement->childNodes[0];
+         
+          if($topLevelElement){
+            while ($topLevelElement->hasChildNodes()) {
+              $topLevelElement->removeChild($topLevelElement->firstChild);
+            }
+            $modifiedHtml = $dom->saveHTML();
+            unset($dom);
+            $modifiedHtml = str_replace("<html>", "", $modifiedHtml);
+            $modifiedHtml = str_replace("</html>", "", $modifiedHtml);
+            $modifiedHtml = str_replace("<body>", "", $modifiedHtml);
+            $modifiedHtml = str_replace("</body>", "", $modifiedHtml);
+            $htmlContent = $modifiedHtml;
+          }
+        }
+        $htmlContent = str_replace("\n", "", $htmlContent);
+        $htmlContent = str_replace("\r", "", $htmlContent);
+        $htmlContent = str_replace("\t", "", $htmlContent);
+        $this->htmlContent = $htmlContent;
+      }
+
+      if($args['innerBlocks'] && count($innerBlocks)){
         $this->innerBlocks = $innerBlocks;
       }
 
@@ -248,30 +314,29 @@ if (!class_exists('WPGraphQLBlocks')) {
             ],
           ],
           'description' => __( 'Returns all blocks as a JSON object', 'wp-graphql-blocks' ),
-          'resolve' => function( \WPGraphQL\Model\Post $post, $args, $context, $info ) {
-            //$post_id = $post->ID;
-            //wp_send_json($post);
+          'resolve' => function( \WPGraphQL\Model\Post $post, $args, $context, $info ) {        
             $the_post = get_post($post->ID);
             $blocks = parse_blocks($the_post->post_content);
             
             $templateName = $post->template['templateName'];
-            // get template
-
-            // first get from wp_postmeta, where post_id === $post->ID && meta_key === _wp_page_template
-            // if exists, then get the meta_value (i.e. "single-sidebar")
-            // use the meta_value in a new query to query the wp_posts table where post_name === meta_value && post_type === "wp_template"
 
             // Get the post meta values
             $the_post_id = $the_post->ID;
             $the_post_content = $the_post->post_content;
             $the_post_type = $the_post->post_type;
-            $meta_value = get_post_meta($the_post_id, '_wp_page_template', true);            
 
+            // START CHECK DB FIRST FOR A TEMPLATE
+            $meta_value = get_post_meta($the_post_id, '_wp_page_template', true);            
             if($meta_value){
+              
+              // first get from wp_postmeta, where post_id === $post->ID && meta_key === _wp_page_template
+              // if exists, then get the meta_value (i.e. "single-sidebar")
+              // use the meta_value in a new query to query the wp_posts table where post_name === meta_value && post_type === "wp_template"
+
               // Define your query arguments
               $templateQueryArgs = array(
                 'post_type'      => 'wp_template', // Specify the post type
-                'post_name'    => $meta_value, // Specify the post status
+                'post_name'    => $meta_value, // Specify the post name
                 'posts_per_page' => 1, // Limit the query to 1 post
               );
 
@@ -281,22 +346,23 @@ if (!class_exists('WPGraphQLBlocks')) {
               // Check if a post was found
               if ($postsFromQuery) {
                 $templatePost = $postsFromQuery[0]; // Get the first (and only) post
+                $templatePostContent = $templatePost->post_content;
+                $templateBlocks = parse_blocks($templatePostContent);
               }
-            }
-
-            $front_page_id = get_option('page_on_front');
-
-            if($templatePost){
-              $templateBlocks = parse_blocks($templatePost->post_content);
-            }else{
+            }else {
+              // THIS POST USES THE DEFAULT TEMPLATE
               // check if page or post
               if($the_post_type === "page"){
+                $front_page_id = get_option('page_on_front');
+                // first check to see if a template file exists for page-{pageId}.html
+                // if not, check to see if a template file exists for page-{slug}.html
+
                 if(!$front_page_id){
                   // TODO: cater for just posts page
                 }else if($front_page_id == $the_post_id){
                   // get front page default template
-                  // get_stylesheet_directory for child theme
-                  // get_template_directory for parent theme
+                  // get_stylesheet_directory for current theme
+                  // get_template_directory for possible parent theme
                   $file_content = file_get_contents(get_stylesheet_directory() . "/templates/front-page.html");
                   if($file_content){
                     $templateBlocks = parse_blocks($file_content);
@@ -306,18 +372,39 @@ if (!class_exists('WPGraphQLBlocks')) {
                       $templateBlocks = parse_blocks($file_content);
                     }
                   }
+                }else {
+                  // this is just a normal page, get the default page template
+                  $file_content = file_get_contents(get_stylesheet_directory() . "/templates/page.html");
+                  if($file_content){
+                    $templateBlocks = parse_blocks($file_content);
+                  }else{
+                    $file_content = file_get_contents(get_template_directory() . "/templates/page.html");
+                    if($file_content){
+                      $templateBlocks = parse_blocks($file_content);
+                    }
+                  }
                 }
-              }else{
-                // 
+              }else {
+                // get the default post template
+                // this is just a normal page
+                $file_content = file_get_contents(get_stylesheet_directory() . "/templates/single.html");
+                if($file_content){
+                  $templateBlocks = parse_blocks($file_content);
+                }else{
+                  $file_content = file_get_contents(get_template_directory() . "/templates/single.html");
+                  if($file_content){
+                    $templateBlocks = parse_blocks($file_content);
+                  }
+                }
               }
             }
+            // END CHECK DB FIRST FOR A TEMPLATE
 
-            /*
-            need to get all templates from /templates directory.
-            this applies to this theme (which may be a child theme),
-            so if this is a child theme, also need to get all templates
-            from the /templates directory of the parent theme
-            */
+            // if there are no template blocks, i.e. no template was found, 
+            // then just set equal to the page blocks;
+            if(!$templateBlocks){
+              $templateBlocks = $blocks;
+            }
 
             $mappedBlocks = [];
             foreach($templateBlocks as $block){
