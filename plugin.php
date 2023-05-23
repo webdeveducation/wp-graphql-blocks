@@ -20,7 +20,6 @@ if (!class_exists('WPGraphQLBlocks')) {
 
   class Block {
     public function __construct($data, $post_id, $post_content, $args) {
-      //wp_send_json($post_id);
       $this->name = $data['blockName'];
 
       $attributes = $data['attrs'];
@@ -33,8 +32,6 @@ if (!class_exists('WPGraphQLBlocks')) {
           $attributes['height'] = $img[2];
         }
       }
-
-      //if($data['blockName'])
   
       if($data['blockName'] == 'core/cover'){
         if($attributes['useFeaturedImage']){
@@ -110,15 +107,39 @@ if (!class_exists('WPGraphQLBlocks')) {
 
       // handle template-parts
       if($data['blockName'] === 'core/template-part' && !empty($data['attrs']['slug'])){
-        // load file from /parts
-        // this is just a normal page, get the default page template
-        $file_content = file_get_contents(get_stylesheet_directory() . "/parts/" . $data['attrs']['slug'] . ".html");
-        if($file_content){
-          $innerBlocksRaw = parse_blocks($file_content);
+        // first check db if template part exists
+        $slug = $data['attrs']['slug'];
+
+        $templatePartQueryArgs = array(
+          'post_type'      => 'wp_template_part',
+          'name'           => $slug,
+          'posts_per_page' => 1,
+        );
+        
+        $templatePartQuery = new \WP_Query( $templatePartQueryArgs );
+        
+        if ( $templatePartQuery->have_posts() ) {
+          while ($templatePartQuery->have_posts()) {
+            $templatePartFromQuery = $templatePartQuery->post;
+            break;
+          }
+          wp_reset_postdata(); // Reset post data after the loop
+        }
+
+        // Check if a post was found
+        if ($templatePartFromQuery) {
+          $templatePartPostContent = $templatePartFromQuery->post_content;
+          $innerBlocksRaw = parse_blocks($templatePartPostContent);
         }else{
-          $file_content = file_get_contents(get_template_directory() . "/parts/" . $data['attrs']['slug'] . ".html");
+          // load file from /parts
+          $file_content = file_get_contents(get_stylesheet_directory() . "/parts/" . $data['attrs']['slug'] . ".html");
           if($file_content){
             $innerBlocksRaw = parse_blocks($file_content);
+          }else{
+            $file_content = file_get_contents(get_template_directory() . "/parts/" . $data['attrs']['slug'] . ".html");
+            if($file_content){
+              $innerBlocksRaw = parse_blocks($file_content);
+            }
           }
         }
       }
@@ -141,7 +162,6 @@ if (!class_exists('WPGraphQLBlocks')) {
           // Retrieve the content/markup of the block pattern
           $block_pattern_content = $block_pattern['content'];
           $innerBlocksRaw = parse_blocks($block_pattern_content);
-          //wp_send_json($innerBlocksRaw);
         }        
       }
 
@@ -164,7 +184,10 @@ if (!class_exists('WPGraphQLBlocks')) {
       $originalContent = str_replace("\n", "", $data['innerHTML']);
       $dynamicContent = str_replace("\n", "", $blockString);
       $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
-      if($args['htmlContent'] && $htmlContent && $data['blockName'] !== "core/pattern"){
+      $htmlContent = str_replace("\n", "", $htmlContent);
+      $htmlContent = str_replace("\r", "", $htmlContent);
+      $htmlContent = str_replace("\t", "", $htmlContent);
+      if($args['htmlContent'] && $htmlContent && $data['blockName'] !== "core/pattern" && $data['blockName'] !== "core/template-part"){
         // if not core/cover, core/media-text, and has inner blocks, gut
         // out the inner html from the top level tag, as it's not needed
         if($data['blockName'] != 'core/cover' && $data['blockName'] != 'core/media-text' && count($innerBlocks)){
@@ -372,7 +395,9 @@ if (!class_exists('WPGraphQLBlocks')) {
                       $templateBlocks = parse_blocks($file_content);
                     }
                   }
-                }else {
+                }
+
+                if(!$templateBlocks){
                   // this is just a normal page, get the default page template
                   $file_content = file_get_contents(get_stylesheet_directory() . "/templates/page.html");
                   if($file_content){
