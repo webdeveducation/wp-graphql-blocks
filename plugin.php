@@ -328,9 +328,15 @@ if (!class_exists('WPGraphQLBlocks')) {
               // OR
               // if there's no post id and there's a blog page set
               // this is the main blog page so load the home.html template
+              // or if home not found, default to index
               $page_template = get_block_template_by_slug("home");
               if ($page_template) {
                 $templateBlocks = parse_blocks($page_template->content);
+              } else {
+                $page_template = get_block_template_by_slug("index");
+                if ($page_template) {
+                  $templateBlocks = parse_blocks($page_template->content);
+                }
               }
             } else {
               $the_post = get_post($post->ID);
