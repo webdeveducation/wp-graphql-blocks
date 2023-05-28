@@ -65,7 +65,7 @@ function get_default_template_for_page($page_id, $page_slug)
 
   // if front page, front-page.html
   $front_page_id = get_option('page_on_front');
-  if ($page_id === $front_page_id) {
+  if ($page_id == $front_page_id) {
     $page_template = get_block_template_by_slug("front-page");
     if ($page_template) {
       return $page_template;
