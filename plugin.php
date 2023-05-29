@@ -69,36 +69,40 @@ if (!class_exists('WPGraphQLBlocks')) {
       }
 
       // MOVE THESE TO FRONT END
-      /*
-      if($data['blockName'] == 'core/table'){
 
+      if ($data['blockName'] == 'core/table') {
       }
 
-      if($data['blockName'] == 'core/paragraph'){
+      if ($data['blockName'] == 'core/paragraph') {
         $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -4);
       }
-      if($data['blockName'] == 'core/heading'){
+      if ($data['blockName'] == 'core/heading') {
         // level assumes that if there's no value set for this attributes, then it's default value is 2
         // so we need to make sure this is reflected in the attributes
-        if(!isset($attributes['level'])){
+        if (!isset($attributes['level'])) {
           $attributes['level'] = 2;
         }
         $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -5);
       }
-      if($data['blockName'] == 'core/columns'){
+      if ($data['blockName'] == 'core/columns') {
         // isStackedOnMobile ASSUMES THAT IF THERE'S NO VALUE SET FOR THIS ATTRIBUTE, THEN IT IS SWITCHED ON BY DEFAULT
         // so we need to make sure this is reflected in the attributes
-        if(!isset($attributes['isStackedOnMobile'])){
+        if (!isset($attributes['isStackedOnMobile'])) {
           $attributes['isStackedOnMobile'] = true;
         }
       }
-      if($data['blockName'] == 'core/gallery'){
+      if ($data['blockName'] == 'core/gallery') {
         // imageCrop ASSUMES THAT IF THERE'S NO VALUE SET FOR THIS ATTRIBUTE, THEN IT IS SWITCHED ON BY DEFAULT
         // so we need to make sure this is reflected in the attributes
-        if(!isset($attributes['imageCrop'])){
+        if (!isset($attributes['imageCrop'])) {
           $attributes['imageCrop'] = true;
         }
-      }*/
+      }
+      if ($data['blockName'] == 'core/navigation') {
+        if (!isset($attributes['showSubmenuIcon'])) {
+          $attributes['showSubmenuIcon'] = true;
+        }
+      }
 
       $attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
       if ($args['attributes'] && $attributes) {
@@ -167,7 +171,7 @@ if (!class_exists('WPGraphQLBlocks')) {
       if ($args['htmlContent'] && $htmlContent && $data['blockName'] !== "core/pattern") {
         // if not core/cover, core/media-text, and has inner blocks, gut
         // out the inner html from the top level tag, as it's not needed
-        if ($data['blockName'] != 'core/cover' && $data['blockName'] != 'core/media-text' && $data['blockName'] !== "core/navigation" && count($innerBlocks)) {
+        if ($data['blockName'] != 'core/cover' && $data['blockName'] != 'core/media-text' && $data['blockName'] !== "core/navigation" && $data['blockName'] !== 'core/navigation-submenu' && count($innerBlocks)) {
           $dom = new \DOMDocument();
           $htmlString = "<html><body>" . $htmlContent . "</body></html>";
           $htmlString = str_replace("\n", "", $htmlString);
