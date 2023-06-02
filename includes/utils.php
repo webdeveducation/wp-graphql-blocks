@@ -223,6 +223,16 @@ function hydrate_html_content($data, $html, $post_id)
     $timeElement->setAttribute('datetime', get_the_date('c'));
     $newFragment->appendXML(get_the_date('', $post_id ?? ""));
     $timeElement->appendChild($newFragment);
+  } else if ($data['blockName'] === "core/read-more") {
+    // gut out the contents of the element first
+    $topLevelElement->setAttribute('href', get_permalink($post_id));
+
+    while ($topLevelElement->hasChildNodes()) {
+      $topLevelElement->removeChild($topLevelElement->firstChild);
+    }
+    $newFragment = $dom->createDocumentFragment();
+    $newFragment->appendXML("Read more<span class=\"screen-reader-text\">: " . (get_the_title($post_id) ?? "") . "</span>");
+    $topLevelElement->appendChild($newFragment);
   }
   $modifiedHtml = $dom->saveHTML();
   unset($dom);

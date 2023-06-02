@@ -125,7 +125,7 @@ if (!class_exists('WPGraphQLBlocks')) {
         $core_query_args = array(
           'post_type' => $query_attrs['postType'],
           'posts_per_page' => $query_attrs['perPage'],
-          'ignore_sticky_posts' => true,
+          'ignore_sticky_posts' => $query_attrs['sticky'] === "exclude",
           'cat' => $query_attrs['taxQuery']['category'] ?: [],
           'orderby' => $query_attrs['orderBy'],
           'order' => $query_attrs['order']
@@ -185,14 +185,8 @@ if (!class_exists('WPGraphQLBlocks')) {
 
           $loop_inner_blocks = [];
 
-          $post_query_result = array_reverse($post_query_result);
           foreach ($post_query_result as $single_post_result) {
             $core_post_template['attrs'] = ['post_id_to_hydrate_template' => $single_post_result->ID];
-            /*array_splice($innerBlocksRaw, $key_for_post_template, 0, array([
-              'blockName' => 'wp-block-tools/loop-item',
-              'innerHTML' => "<li class=\"wp-block-post post-" . $single_post_result->ID . " post type-post status-publish format-standard hentry category-sub-cool-category\">\n</li>",
-              'innerBlocks' => array($core_post_template)
-            ]));*/
             $loop_inner_blocks[] = [
               'blockName' => 'wp-block-tools/loop-item',
               'innerHTML' => "<li class=\"wp-block-post post-" . $single_post_result->ID . " post type-post status-publish format-standard hentry category-sub-cool-category\"></li>",
