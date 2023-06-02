@@ -185,3 +185,50 @@ function load_file_contents($path)
   }
   return null;
 }
+
+function hydrate_attributes($block_data, $post_id)
+{
+  $new_attrs = $block_data['attrs'];
+  if ($block_data['blockName'] === "core/post-title") {
+    $new_attrs['content'] = get_the_title($post_id) ?? "";
+  }
+  return $new_attrs;
+}
+
+function hydrate_html_content($data, $html, $post_id)
+{
+  $dom = new \DOMDocument();
+  $htmlString = "<html><body>" . $html . "</body></html>";
+  $htmlString = str_replace("\n", "", $htmlString);
+  $htmlString = str_replace("\r", "", $htmlString);
+  $htmlString = str_replace("\t", "", $htmlString);
+  $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+  $bodyElement = $dom->getElementsByTagName('body')->item(0);
+  $topLevelElement = $bodyElement->childNodes[0];
+
+  if ($data['blockName'] === "core/post-title") {
+    // gut out the contents of the element first
+    while ($topLevelElement->hasChildNodes()) {
+      $topLevelElement->removeChild($topLevelElement->firstChild);
+    }
+    $newFragment = $dom->createDocumentFragment();
+    $newFragment->appendXML(get_the_title($post_id) ?? "");
+    $topLevelElement->appendChild($newFragment);
+  } else if ($data['blockName'] === "core/post-date") {
+    $timeElement = $topLevelElement->childNodes[0];
+    while ($timeElement->hasChildNodes()) {
+      $timeElement->removeChild($timeElement->firstChild);
+    }
+    $newFragment = $dom->createDocumentFragment();
+    $timeElement->setAttribute('datetime', get_the_date('c'));
+    $newFragment->appendXML(get_the_date('', $post_id ?? ""));
+    $timeElement->appendChild($newFragment);
+  }
+  $modifiedHtml = $dom->saveHTML();
+  unset($dom);
+  $modifiedHtml = str_replace("<html>", "", $modifiedHtml);
+  $modifiedHtml = str_replace("</html>", "", $modifiedHtml);
+  $modifiedHtml = str_replace("<body>", "", $modifiedHtml);
+  $modifiedHtml = str_replace("</body>", "", $modifiedHtml);
+  return $modifiedHtml;
+}

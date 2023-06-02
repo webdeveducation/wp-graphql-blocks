@@ -24,10 +24,9 @@ if (!class_exists('WPGraphQLBlocks')) {
 
   class Block
   {
-    public function __construct($data, $post_id, $post_content, $args)
+    public function __construct($data, $post_id, $post_content)
     {
       $this->name = $data['blockName'];
-
       $attributes = $data['attrs'];
 
       if ($data['blockName'] == 'core/media-text') {
@@ -68,8 +67,6 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
-      // MOVE THESE TO FRONT END
-
       if ($data['blockName'] == 'core/table') {
       }
 
@@ -104,8 +101,13 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
+      if ($attributes['post_id_to_hydrate_template']) {
+        // need to hydrate attributes
+        $attributes = hydrate_attributes($data, $attributes['post_id_to_hydrate_template']);
+      }
+
       $attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
-      if ($args['attributes'] && $attributes) {
+      if ($attributes) {
         $this->attributes = $attributes;
       }
 
@@ -113,6 +115,96 @@ if (!class_exists('WPGraphQLBlocks')) {
 
       if ($data['blockName'] === 'core/post-content') {
         $innerBlocksRaw = parse_blocks($post_content);
+      }
+
+      if ($data['blockName'] === 'core/query') {
+        //$innerBlocksRaw = [];
+
+        $query_attrs = $attributes['query'];
+
+        $core_query_args = array(
+          'post_type' => $query_attrs['postType'],
+          'posts_per_page' => $query_attrs['perPage'],
+          'ignore_sticky_posts' => true,
+          'cat' => $query_attrs['taxQuery']['category'] ?: [],
+          'orderby' => $query_attrs['orderBy'],
+          'order' => $query_attrs['order']
+        );
+
+        if ($query_attrs['sticky'] === "exclude") {
+          $sticky_posts = get_option('sticky_posts');
+          $core_query_args['post__not_in'] = $sticky_posts;
+        } else if ($query_attrs['sticky'] === "only") {
+          $sticky_posts = get_option('sticky_posts');
+          $core_query_args['post__in'] = $sticky_posts;
+        }
+
+        $query = new \WP_Query($core_query_args);
+
+        $post_query_result = array();
+
+        if ($query->have_posts()) {
+          while ($query->have_posts()) {
+            $query->the_post();
+            $post_result = get_post(); // Get the entire post and store it in a variable
+            $post_query_result[] = $post_result;
+          }
+          foreach ($innerBlocksRaw as $key1 => $innerBlock) {
+            if ($innerBlock['blockName'] === "core/query-pagination") {
+              foreach ($innerBlock['innerBlocks'] as $key2 => $paginationInnerBlock) {
+                if ($paginationInnerBlock['blockName'] === "core/query-pagination-numbers") {
+                  $innerBlocksRaw[$key1]['innerBlocks'][$key2]['attrs']['totalPages'] = $query->max_num_pages;
+                  $innerBlocksRaw[$key1]['innerBlocks'][$key2]['attrs']['queryId'] = $attributes['queryId'];
+                  break;
+                }
+              }
+              break;
+            } else if ($innerBlock['blockName'] === 'core/post-template') {
+              $key_for_post_template = $key1;
+              $core_post_template = $innerBlock;
+            }
+          }
+          wp_reset_postdata();
+        }
+
+        if (isset($key_for_post_template) && isset($core_post_template)) {
+          // replace the element at the specified index
+          $core_post_template_block_string = render_block($core_post_template);
+          // at this point, add class names to the ul tag, based on the $data['attrs'] (i.e. the core/query attributes)
+          $core_post_template_block_string = substr($core_post_template_block_string, 0, strpos($core_post_template_block_string, ">")) . "></ul>";
+
+          if ($data['attrs'] && $data['attrs']['displayLayout'] && $data['attrs']['displayLayout']['type'] === "flex") {
+            $core_post_template_block_string = substr($core_post_template_block_string, 0, strpos($core_post_template_block_string, ">")) . "></ul>";
+            $core_post_template_block_string = str_replace("class=\"", "class=\"is-flex-container ", $core_post_template_block_string);
+          }
+
+          if ($data['attrs'] && $data['attrs']['displayLayout'] && isset($data['attrs']['displayLayout']['columns'])) {
+            $core_post_template_block_string = substr($core_post_template_block_string, 0, strpos($core_post_template_block_string, ">")) . "></ul>";
+            $core_post_template_block_string = str_replace("class=\"", "class=\"columns-" . $data['attrs']['displayLayout']['columns'] . " ", $core_post_template_block_string);
+          }
+
+          $loop_inner_blocks = [];
+
+          $post_query_result = array_reverse($post_query_result);
+          foreach ($post_query_result as $single_post_result) {
+            $core_post_template['attrs'] = ['post_id_to_hydrate_template' => $single_post_result->ID];
+            /*array_splice($innerBlocksRaw, $key_for_post_template, 0, array([
+              'blockName' => 'wp-block-tools/loop-item',
+              'innerHTML' => "<li class=\"wp-block-post post-" . $single_post_result->ID . " post type-post status-publish format-standard hentry category-sub-cool-category\">\n</li>",
+              'innerBlocks' => array($core_post_template)
+            ]));*/
+            $loop_inner_blocks[] = [
+              'blockName' => 'wp-block-tools/loop-item',
+              'innerHTML' => "<li class=\"wp-block-post post-" . $single_post_result->ID . " post type-post status-publish format-standard hentry category-sub-cool-category\"></li>",
+              'innerBlocks' => array($core_post_template)
+            ];
+          }
+          array_splice($innerBlocksRaw, $key_for_post_template, 1, array([
+            'blockName' => 'wp-block-tools/loop',
+            'innerHTML' => $core_post_template_block_string,
+            'innerBlocks' => $loop_inner_blocks
+          ]));
+        }
       }
 
       // handle template-parts
@@ -158,40 +250,50 @@ if (!class_exists('WPGraphQLBlocks')) {
 
       $innerBlocks = [];
       foreach ($innerBlocksRaw as $innerBlock) {
-        $innerBlocks[] = new Block($innerBlock, $post_id, $post_content, $args);
+        if (isset($attributes['post_id_to_hydrate_template'])) {
+          $innerBlock['attrs']['post_id_to_hydrate_template'] = $attributes['post_id_to_hydrate_template'];
+        }
+        $innerBlocks[] = new Block($innerBlock, $post_id, $post_content);
       }
 
       $blockString = render_block($data);
       $originalContent = str_replace("\n", "", $data['innerHTML']);
       $dynamicContent = str_replace("\n", "", $blockString);
+      if ($data['blockName'] === 'wp-block-tools/loop-item') {
+        //wp_send_json($originalContent);
+      }
       $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
       $htmlContent = str_replace("\n", "", $htmlContent);
       $htmlContent = str_replace("\r", "", $htmlContent);
       $htmlContent = str_replace("\t", "", $htmlContent);
-      if ($args['htmlContent'] && $htmlContent && $data['blockName'] !== "core/pattern") {
+
+      if ($htmlContent && $data['blockName'] !== "core/pattern") {
         // if not core/cover, core/media-text, and has inner blocks, gut
         // out the inner html from the top level tag, as it's not needed
-        if ($data['blockName'] != 'core/cover' && $data['blockName'] != 'core/media-text' && $data['blockName'] !== "core/navigation" && $data['blockName'] !== 'core/navigation-submenu' && count($innerBlocks)) {
-          $dom = new \DOMDocument();
-          $htmlString = "<html><body>" . $htmlContent . "</body></html>";
-          $htmlString = str_replace("\n", "", $htmlString);
-          $htmlString = str_replace("\r", "", $htmlString);
-          $htmlString = str_replace("\t", "", $htmlString);
-          $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-          $bodyElement = $dom->getElementsByTagName('body')->item(0);
-          $topLevelElement = $bodyElement->childNodes[0];
-
-          if ($topLevelElement) {
-            while ($topLevelElement->hasChildNodes()) {
-              $topLevelElement->removeChild($topLevelElement->firstChild);
+        if ($data['blockName'] !== 'wp-block-tools/loop-item' && $data['blockName'] !== 'core/cover' && $data['blockName'] !== 'core/media-text' && $data['blockName'] !== "core/navigation" && $data['blockName'] !== 'core/navigation-submenu') {
+          if (count($innerBlocks)) {
+            $dom = new \DOMDocument();
+            $htmlString = "<html><body>" . $htmlContent . "</body></html>";
+            $htmlString = str_replace("\n", "", $htmlString);
+            $htmlString = str_replace("\r", "", $htmlString);
+            $htmlString = str_replace("\t", "", $htmlString);
+            $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+            $bodyElement = $dom->getElementsByTagName('body')->item(0);
+            $topLevelElement = $bodyElement->childNodes[0];
+            if ($topLevelElement) {
+              while ($topLevelElement->hasChildNodes()) {
+                $topLevelElement->removeChild($topLevelElement->firstChild);
+              }
+              $modifiedHtml = $dom->saveHTML();
+              unset($dom);
+              $modifiedHtml = str_replace("<html>", "", $modifiedHtml);
+              $modifiedHtml = str_replace("</html>", "", $modifiedHtml);
+              $modifiedHtml = str_replace("<body>", "", $modifiedHtml);
+              $modifiedHtml = str_replace("</body>", "", $modifiedHtml);
+              $htmlContent = $modifiedHtml;
             }
-            $modifiedHtml = $dom->saveHTML();
-            unset($dom);
-            $modifiedHtml = str_replace("<html>", "", $modifiedHtml);
-            $modifiedHtml = str_replace("</html>", "", $modifiedHtml);
-            $modifiedHtml = str_replace("<body>", "", $modifiedHtml);
-            $modifiedHtml = str_replace("</body>", "", $modifiedHtml);
-            $htmlContent = $modifiedHtml;
+          } else if ($data['attrs']['post_id_to_hydrate_template']) {
+            $htmlContent = hydrate_html_content($data, $htmlContent, $data['attrs']['post_id_to_hydrate_template']);
           }
         }
         $htmlContent = str_replace("\n", "", $htmlContent);
@@ -200,7 +302,26 @@ if (!class_exists('WPGraphQLBlocks')) {
         $this->htmlContent = $htmlContent;
       }
 
-      if ($args['innerBlocks'] && count($innerBlocks)) {
+      /*if ($core_post_template && $data['blockName'] === 'core/query') {
+        $core_post_template_block_string = render_block($core_post_template);
+        $core_post_template_block_string = substr($core_post_template_block_string, 0, strpos($core_post_template_block_string, ">")) . "></ul>";
+        $this->htmlContent = str_replace('</', $core_post_template_block_string . '</', $this->htmlContent);
+      }*/
+
+      if ($data['blockName'] === 'core/post-template') {
+        unset($this->htmlContent);
+      }
+
+      if ($data['blockName'] === "core/comments") {
+        $comments_allowed_globally = get_option('default_comment_status');
+        $temp_post = get_post($post_id);
+        if (!$comments_allowed_globally || ($comments_allowed_globally && $temp_post->comment_status === "closed")) {
+          unset($this->htmlContent);
+          $innerBlocks = [];
+        }
+      }
+
+      if (count($innerBlocks)) {
         $this->innerBlocks = $innerBlocks;
       }
 
@@ -300,28 +421,6 @@ if (!class_exists('WPGraphQLBlocks')) {
 
         register_graphql_field('Node', 'blocks', [
           'type' => 'JSON',
-          'args' => [
-            'htmlContent' => [
-              'type' => 'Boolean',
-              'description' => 'Whether to return the htmlContent for each block',
-              'defaultValue' => true,
-            ],
-            'attributes' => [
-              'type' => 'Boolean',
-              'description' => 'Whether to return the attributes for each block',
-              'defaultValue' => true,
-            ],
-            'name' => [
-              'type' => 'Boolean',
-              'description' => 'Whether to return the name for each block',
-              'defaultValue' => true,
-            ],
-            'innerBlocks' => [
-              'type' => 'Boolean',
-              'description' => 'Whether to return the innerBlocks for each block',
-              'defaultValue' => true,
-            ],
-          ],
           'description' => __('Returns all blocks as a JSON object', 'wp-graphql-blocks'),
           'resolve' => function ($post, $args, $context, $info) {
             $uri = $post->uri;
@@ -364,7 +463,7 @@ if (!class_exists('WPGraphQLBlocks')) {
             $mappedBlocks = [];
             foreach ($templateBlocks as $block) {
               if (isset($block['blockName'])) {
-                $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content, $args);
+                $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content, null);
               }
             }
             return wp_json_encode($mappedBlocks);
