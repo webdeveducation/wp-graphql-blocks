@@ -250,12 +250,18 @@ if (!class_exists('WPGraphQLBlocks')) {
         $innerBlocks[] = new Block($innerBlock, $post_id, $post_content);
       }
 
+      if ($data['attrs']['post_id_to_hydrate_template']) {
+        // set global post object here
+        global $post;
+        $post = get_post($data['attrs']['post_id_to_hydrate_template']);
+        setup_postdata($post);
+      }
+
       $blockString = render_block($data);
+      wp_reset_postdata();
       $originalContent = str_replace("\n", "", $data['innerHTML']);
       $dynamicContent = str_replace("\n", "", $blockString);
-      if ($data['blockName'] === 'wp-block-tools/loop-item') {
-        //wp_send_json($originalContent);
-      }
+
       $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
       $htmlContent = str_replace("\n", "", $htmlContent);
       $htmlContent = str_replace("\r", "", $htmlContent);
@@ -286,8 +292,6 @@ if (!class_exists('WPGraphQLBlocks')) {
               $modifiedHtml = str_replace("</body>", "", $modifiedHtml);
               $htmlContent = $modifiedHtml;
             }
-          } else if ($data['attrs']['post_id_to_hydrate_template']) {
-            $htmlContent = hydrate_html_content($data, $htmlContent, $data['attrs']['post_id_to_hydrate_template']);
           }
         }
         $htmlContent = str_replace("\n", "", $htmlContent);
