@@ -52,7 +52,7 @@ if (!class_exists('WPGraphQLBlocks')) {
       }
 
       if ($data['blockName'] == 'core/post-title') {
-        $attributes['content'] = get_the_title($post_id) ?? "";
+        $attributes['content'] = get_the_title($data['attrs']['post_id_to_hydrate_template'] ?? $post_id) ?? "";
       }
 
       if ($data['blockName'] == 'core/image') {
@@ -99,11 +99,6 @@ if (!class_exists('WPGraphQLBlocks')) {
         if (!isset($attributes['showSubmenuIcon'])) {
           $attributes['showSubmenuIcon'] = true;
         }
-      }
-
-      if ($attributes['post_id_to_hydrate_template']) {
-        // need to hydrate attributes
-        $attributes = hydrate_attributes($data, $attributes['post_id_to_hydrate_template']);
       }
 
       $attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);

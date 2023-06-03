@@ -185,12 +185,3 @@ function load_file_contents($path)
   }
   return null;
 }
-
-function hydrate_attributes($block_data, $post_id)
-{
-  $new_attrs = $block_data['attrs'];
-  if ($block_data['blockName'] === "core/post-title") {
-    $new_attrs['content'] = get_the_title($post_id) ?? "";
-  }
-  return $new_attrs;
-}
