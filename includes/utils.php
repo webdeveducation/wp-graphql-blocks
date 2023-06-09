@@ -185,3 +185,97 @@ function load_file_contents($path)
   }
   return null;
 }
+
+function get_query_by_id($query_id, $mappedBlocks)
+{
+  function traverse($query_id, $blocks)
+  {
+    foreach ($blocks as $block) {
+      if ($block->name === "core/query") {
+        if ($block->attributes['queryId'] == $query_id) {
+          return $block;
+        }
+      }
+      if (count($block->innerBlocks ?? [])) {
+        $found = traverse($query_id, $block->innerBlocks);
+        if ($found) {
+          return $found;
+        }
+      }
+    }
+  }
+  return traverse($query_id, $mappedBlocks);
+}
+
+function get_mapped_blocks($post)
+{
+  $uri = $post->uri;
+  $main_blog_page_id = get_option('page_for_posts');
+  if ((!$post->ID && $uri === "/") || (!$post->ID && $main_blog_page_id !== "0") || ($post->ID == $main_blog_page_id)) {
+    // if no post id and the page is the index page,
+    // then we need to load the home.html template
+    // OR
+    // if there's no post id and there's a blog page set
+    // this is the main blog page so load the home.html template
+    // or if home not found, default to index
+    $page_template = get_block_template_by_slug("home");
+    if ($page_template) {
+      $templateBlocks = parse_blocks($page_template->content);
+    } else {
+      $page_template = get_block_template_by_slug("index");
+      if ($page_template) {
+        $templateBlocks = parse_blocks($page_template->content);
+      }
+    }
+  } else {
+    $the_post = get_post($post->ID);
+    $blocks = parse_blocks($the_post->post_content);
+
+    // Get the post meta values
+    $the_post_id = $the_post->ID;
+    $the_post_content = $the_post->post_content;
+    $the_post_type = $the_post->post_type;
+    $the_post_slug = $the_post->post_name;
+
+    $templateBlocks = get_template_blocks($the_post_id, $the_post_type, $the_post_slug);
+  }
+
+  // if there are no template blocks, i.e. no template was found, 
+  // then just set equal to the page blocks;
+  if (!$templateBlocks) {
+    $templateBlocks = $blocks;
+  }
+
+  $mappedBlocks = [];
+  foreach ($templateBlocks as $block) {
+    if (isset($block['blockName'])) {
+      $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content);
+    }
+  }
+  return $mappedBlocks;
+}
+
+function clean_attributes($blocks)
+{
+  function clean($blocks)
+  {
+    foreach ($blocks as $block) {
+      if ($block->attributes && $block->attributes['post_id_to_hydrate_template']) {
+        unset($block->attributes['post_id_to_hydrate_template']);
+      }
+      if ($block->attributes && $block->attributes['postTemplateRaw']) {
+        unset($block->attributes['postTemplateRaw']);
+      }
+
+      if (!$block->attributes || !count($block->attributes)) {
+        unset($block->attributes);
+      }
+
+      if ($block->innerBlocks) {
+        clean($block->innerBlocks);
+      }
+    }
+  }
+  clean($blocks);
+  return $blocks;
+}

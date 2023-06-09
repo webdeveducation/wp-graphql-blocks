@@ -102,19 +102,14 @@ if (!class_exists('WPGraphQLBlocks')) {
       }
 
       $attributes = apply_filters('wp_graphql_blocks_process_attributes', $attributes, $data, $post_id);
-      if ($attributes) {
-        $this->attributes = $attributes;
-      }
 
       $innerBlocksRaw = $data['innerBlocks'];
 
-      if ($data['blockName'] === 'core/post-content') {
+      if ($data['blockName'] === 'core/post-content' && isset($post_content)) {
         $innerBlocksRaw = parse_blocks($post_content);
       }
 
       if ($data['blockName'] === 'core/query') {
-        //$innerBlocksRaw = [];
-
         $query_attrs = $attributes['query'];
 
         $core_query_args = array(
@@ -123,7 +118,11 @@ if (!class_exists('WPGraphQLBlocks')) {
           'ignore_sticky_posts' => $query_attrs['sticky'] === "exclude",
           'cat' => $query_attrs['taxQuery']['category'] ?: [],
           'orderby' => $query_attrs['orderBy'],
-          'order' => $query_attrs['order']
+          // 'desc' or 'asc'
+          'order' => $query_attrs['order'],
+          'offset' => $query_attrs['offset'],
+          's' => $query_attrs['search'],
+          'author' => $query_attrs['author']
         );
 
         if ($query_attrs['sticky'] === "exclude") {
@@ -148,7 +147,8 @@ if (!class_exists('WPGraphQLBlocks')) {
             if ($innerBlock['blockName'] === "core/query-pagination") {
               foreach ($innerBlock['innerBlocks'] as $key2 => $paginationInnerBlock) {
                 if ($paginationInnerBlock['blockName'] === "core/query-pagination-numbers") {
-                  $innerBlocksRaw[$key1]['innerBlocks'][$key2]['attrs']['totalPages'] = $query->max_num_pages;
+                  $innerBlocksRaw[$key1]['innerBlocks'][$key2]['attrs']['totalResults'] = $query->found_posts - intval($query_attrs['offset'] ?? 0);
+                  $innerBlocksRaw[$key1]['innerBlocks'][$key2]['attrs']['totalPages'] = ceil(($query->found_posts - intval($query_attrs['offset'] ?? 0)) / $query_attrs['perPage']);
                   $innerBlocksRaw[$key1]['innerBlocks'][$key2]['attrs']['queryId'] = $attributes['queryId'];
                   break;
                 }
@@ -157,6 +157,7 @@ if (!class_exists('WPGraphQLBlocks')) {
             } else if ($innerBlock['blockName'] === 'core/post-template') {
               $key_for_post_template = $key1;
               $core_post_template = $innerBlock;
+              $attributes['postTemplateRaw'] = $core_post_template;
             }
           }
           wp_reset_postdata();
@@ -235,6 +236,10 @@ if (!class_exists('WPGraphQLBlocks')) {
         if (!empty($reusablePost)) {
           $innerBlocksRaw = parse_blocks($reusablePost->post_content);
         }
+      }
+
+      if ($attributes) {
+        $this->attributes = $attributes;
       }
 
       $innerBlocks = [];
@@ -412,53 +417,129 @@ if (!class_exists('WPGraphQLBlocks')) {
           }
         ]);
 
+        register_graphql_field('RootQuery', 'coreQuery', [
+          'type' => 'JSON',
+          'description' => __('Returns'),
+          'args' => [
+            'postId' => [
+              'type' => ['non_null' => 'Int'],
+              'description' => 'Argument 1 description',
+            ],
+            'queryId' => [
+              'type' => ['non_null' => 'Int'],
+              'description' => 'Argument 2 description',
+            ],
+            'page' => [
+              'type' => ['non_null' => 'Int'],
+            ],
+          ],
+          'resolve' => function ($node, $args) {
+            // get post by postId
+            $postId = $args['postId'];
+            $queryId = $args['queryId'];
+            $page = $args['page'];
+            $post = get_post($postId);
+            $mappedBlocks = get_mapped_blocks($post);
+            $mappedBlocksResult = [];
+            $queryBlock = get_query_by_id($queryId, $mappedBlocks);
+            if (isset($queryBlock)) {
+              // query found!
+              // if query found, grab attributes.query
+              $query_attrs = $queryBlock->attributes['query'];
+              // if query found, grab the postTemplateRaw
+              $postTemplateRaw = $queryBlock->attributes['postTemplateRaw'];
+
+              $core_query_args = array(
+                'post_type' => $query_attrs['postType'],
+                'posts_per_page' => $query_attrs['perPage'],
+                'ignore_sticky_posts' => $query_attrs['sticky'] === "exclude",
+                'cat' => $query_attrs['taxQuery']['category'] ?: [],
+                'orderby' => $query_attrs['orderBy'],
+                // 'desc' or 'asc'
+                'order' => $query_attrs['order'],
+                //'offset' => $query_attrs['offset'] ?? 0,
+                's' => $query_attrs['search'],
+                'author' => $query_attrs['author'],
+                'paged' => $page,
+              );
+
+              if (isset($query_attrs['offset']) && $query_attrs['offset'] != "0") {
+                $core_query_args['offset'] = $query_attrs['offset'] * $page;
+              }
+
+              if ($query_attrs['sticky'] === "exclude") {
+                $sticky_posts = get_option('sticky_posts');
+                $core_query_args['post__not_in'] = $sticky_posts;
+              } else if ($query_attrs['sticky'] === "only") {
+                $sticky_posts = get_option('sticky_posts');
+                $core_query_args['post__in'] = $sticky_posts;
+              }
+
+              $query = new \WP_Query($core_query_args);
+
+              $post_query_result = array();
+
+              if ($query->have_posts()) {
+                while ($query->have_posts()) {
+                  $query->the_post();
+                  $post_result = get_post(); // Get the entire post and store it in a variable
+                  $post_query_result[] = $post_result;
+                }
+              }
+
+              wp_reset_postdata();
+
+              $core_post_template = $postTemplateRaw;
+
+              if (isset($core_post_template)) {
+                // replace the element at the specified index
+                $core_post_template_block_string = render_block($core_post_template);
+                // at this point, add class names to the ul tag, based on the $data['attrs'] (i.e. the core/query attributes)
+                $core_post_template_block_string = substr($core_post_template_block_string, 0, strpos($core_post_template_block_string, ">")) . "></ul>";
+
+                if ($queryBlock->attributes && $queryBlock->attributes['displayLayout'] && $queryBlock->attributes['displayLayout']['type'] === "flex") {
+                  $core_post_template_block_string = substr($core_post_template_block_string, 0, strpos($core_post_template_block_string, ">")) . "></ul>";
+                  $core_post_template_block_string = str_replace("class=\"", "class=\"is-flex-container ", $core_post_template_block_string);
+                }
+
+                if ($queryBlock->attributes && $queryBlock->attributes['displayLayout'] && isset($queryBlock->attributes['displayLayout']['columns'])) {
+                  $core_post_template_block_string = substr($core_post_template_block_string, 0, strpos($core_post_template_block_string, ">")) . "></ul>";
+                  $core_post_template_block_string = str_replace("class=\"", "class=\"columns-" . $queryBlock->attributes['displayLayout']['columns'] . " ", $core_post_template_block_string);
+                }
+
+                $loop_inner_blocks = [];
+
+                foreach ($post_query_result as $single_post_result) {
+                  $core_post_template['attrs'] = ['post_id_to_hydrate_template' => $single_post_result->ID];
+                  $loop_inner_blocks[] = [
+                    'blockName' => 'wp-block-tools/loop-item',
+                    'innerHTML' => "<li class=\"wp-block-post post-" . $single_post_result->ID . " post type-post status-publish format-standard hentry category-sub-cool-category\"></li>",
+                    'innerBlocks' => array($core_post_template)
+                  ];
+                }
+                $result = array([
+                  'blockName' => 'wp-block-tools/loop',
+                  'innerHTML' => $core_post_template_block_string,
+                  'innerBlocks' => $loop_inner_blocks
+                ]);
+                foreach ($result as $block) {
+                  if (isset($block['blockName'])) {
+                    $mappedBlocksResult[] = new Block($block, $postId, null);
+                  }
+                }
+              }
+            }
+            $mappedBlocksResult = clean_attributes($mappedBlocksResult);
+            return wp_json_encode($mappedBlocksResult);
+          }
+        ]);
+
         register_graphql_field('Node', 'blocks', [
           'type' => 'JSON',
           'description' => __('Returns all blocks as a JSON object', 'wp-graphql-blocks'),
           'resolve' => function ($post, $args, $context, $info) {
-            $uri = $post->uri;
-            $main_blog_page_id = get_option('page_for_posts');
-            if ((!$post->ID && $uri === "/") || (!$post->ID && $main_blog_page_id)) {
-              // if no post id and the page is the index page,
-              // then we need to load the home.html template
-              // OR
-              // if there's no post id and there's a blog page set
-              // this is the main blog page so load the home.html template
-              // or if home not found, default to index
-              $page_template = get_block_template_by_slug("home");
-              if ($page_template) {
-                $templateBlocks = parse_blocks($page_template->content);
-              } else {
-                $page_template = get_block_template_by_slug("index");
-                if ($page_template) {
-                  $templateBlocks = parse_blocks($page_template->content);
-                }
-              }
-            } else {
-              $the_post = get_post($post->ID);
-              $blocks = parse_blocks($the_post->post_content);
-
-              // Get the post meta values
-              $the_post_id = $the_post->ID;
-              $the_post_content = $the_post->post_content;
-              $the_post_type = $the_post->post_type;
-              $the_post_slug = $the_post->post_name;
-
-              $templateBlocks = get_template_blocks($the_post_id, $the_post_type, $the_post_slug);
-            }
-
-            // if there are no template blocks, i.e. no template was found, 
-            // then just set equal to the page blocks;
-            if (!$templateBlocks) {
-              $templateBlocks = $blocks;
-            }
-
-            $mappedBlocks = [];
-            foreach ($templateBlocks as $block) {
-              if (isset($block['blockName'])) {
-                $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content, null);
-              }
-            }
+            $mappedBlocks = get_mapped_blocks($post);
+            $mappedBlocks = clean_attributes($mappedBlocks);
             return wp_json_encode($mappedBlocks);
           }
         ]);
