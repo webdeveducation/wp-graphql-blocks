@@ -150,10 +150,8 @@ if (!class_exists('WPGraphQLBlocks')) {
                   $innerBlocksRaw[$key1]['innerBlocks'][$key2]['attrs']['totalResults'] = $query->found_posts - intval($query_attrs['offset'] ?? 0);
                   $innerBlocksRaw[$key1]['innerBlocks'][$key2]['attrs']['totalPages'] = ceil(($query->found_posts - intval($query_attrs['offset'] ?? 0)) / $query_attrs['perPage']);
                   $innerBlocksRaw[$key1]['innerBlocks'][$key2]['attrs']['queryId'] = $attributes['queryId'];
-                  break;
                 }
               }
-              break;
             } else if ($innerBlock['blockName'] === 'core/post-template') {
               $key_for_post_template = $key1;
               $core_post_template = $innerBlock;
@@ -534,12 +532,12 @@ if (!class_exists('WPGraphQLBlocks')) {
           }
         ]);
 
-        register_graphql_field('Node', 'blocks', [
+        register_graphql_field('ContentNode', 'blocks', [
           'type' => 'JSON',
           'description' => __('Returns all blocks as a JSON object', 'wp-graphql-blocks'),
           'resolve' => function ($post, $args, $context, $info) {
             $mappedBlocks = get_mapped_blocks($post);
-            $mappedBlocks = clean_attributes($mappedBlocks);
+            //$mappedBlocks = clean_attributes($mappedBlocks);
             return wp_json_encode($mappedBlocks);
           }
         ]);
