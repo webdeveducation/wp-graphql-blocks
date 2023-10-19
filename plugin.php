@@ -24,10 +24,19 @@ if (!class_exists('WPGraphQLBlocks')) {
 
   class Block
   {
-    public function __construct($data, $post_id, $post_content)
+    public function __construct($data, $post_id, $post_content, $query_args)
     {
       $this->name = $data['blockName'];
       $attributes = $data['attrs'];
+
+      if($data['blockName'] === "core/site-logo"){
+        $custom_logo_id = get_theme_mod( 'custom_logo' );
+        if($custom_logo_id){
+          $logo = wp_get_attachment_image_src( $custom_logo_id , 'full' );
+          $attributes['id'] = (int)$custom_logo_id;
+          $attributes['url'] = $logo[0];
+        }
+      }
 
       if ($data['blockName'] == 'core/media-text') {
         // get media item
@@ -36,6 +45,11 @@ if (!class_exists('WPGraphQLBlocks')) {
           $attributes['width'] = $img[1];
           $attributes['height'] = $img[2];
         }
+      }
+
+      if($data['blockName'] === 'core/post-featured-image'){
+        $attributes['id'] = get_post_thumbnail_id($post_id);
+        $attributes['url'] = get_the_post_thumbnail_url($post_id, 'full');
       }
 
       if ($data['blockName'] == 'core/cover') {
@@ -67,20 +81,6 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
-      if ($data['blockName'] == 'core/table') {
-      }
-
-      if ($data['blockName'] == 'core/paragraph') {
-        $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -4);
-      }
-      if ($data['blockName'] == 'core/heading') {
-        // level assumes that if there's no value set for this attributes, then it's default value is 2
-        // so we need to make sure this is reflected in the attributes
-        if (!isset($attributes['level'])) {
-          $attributes['level'] = 2;
-        }
-        $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -5);
-      }
       if ($data['blockName'] == 'core/columns') {
         // isStackedOnMobile ASSUMES THAT IF THERE'S NO VALUE SET FOR THIS ATTRIBUTE, THEN IT IS SWITCHED ON BY DEFAULT
         // so we need to make sure this is reflected in the attributes
@@ -164,6 +164,7 @@ if (!class_exists('WPGraphQLBlocks')) {
         if (isset($key_for_post_template) && isset($core_post_template)) {
           // replace the element at the specified index
           $core_post_template_block_string = render_block($core_post_template);
+         
           // at this point, add class names to the ul tag, based on the $data['attrs'] (i.e. the core/query attributes)
           $core_post_template_block_string = substr($core_post_template_block_string, 0, strpos($core_post_template_block_string, ">")) . "></ul>";
 
@@ -226,8 +227,8 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
-      // handle mapping reusable blocks to innerBlocks.
-      if ($data['blockName'] === 'core/block' && !empty($data['attrs']['ref'])) {
+      // handle mapping reference to other blocks to innerBlocks.
+      if (!empty($data['attrs']['ref'])) {
         $ref = $data['attrs']['ref'];
         $reusablePost = get_post($ref);
 
@@ -236,16 +237,14 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
 
-      if ($attributes) {
-        $this->attributes = $attributes;
-      }
-
       $innerBlocks = [];
       foreach ($innerBlocksRaw as $innerBlock) {
         if (isset($attributes['post_id_to_hydrate_template'])) {
           $innerBlock['attrs']['post_id_to_hydrate_template'] = $attributes['post_id_to_hydrate_template'];
         }
-        $innerBlocks[] = new Block($innerBlock, $post_id, $post_content);
+        if (isset($innerBlock['blockName'])) {
+          $innerBlocks[] = new Block($innerBlock, $post_id, $post_content, $query_args);
+        }
       }
 
       if ($data['attrs']['post_id_to_hydrate_template']) {
@@ -260,10 +259,63 @@ if (!class_exists('WPGraphQLBlocks')) {
       $originalContent = str_replace("\n", "", $data['innerHTML']);
       $dynamicContent = str_replace("\n", "", $blockString);
 
+      // dynamicContent and originalContent are false by default.
+      // if they are true, add them
+      if($query_args['dynamicContent']){
+        $this->dynamicContent = $dynamicContent;
+      }
+
+      if($query_args['originalContent']){
+        $this->originalContent = $originalContent;
+      }
+
       $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
       $htmlContent = str_replace("\n", "", $htmlContent);
       $htmlContent = str_replace("\r", "", $htmlContent);
       $htmlContent = str_replace("\t", "", $htmlContent);
+
+      if($data['blockName'] === "core/list-item"){
+        $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -5);
+      }
+
+      if ($data['blockName'] == 'core/paragraph') {
+        $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -4);
+        if($attributes['align']){
+          $attributes['textAlign'] = $attributes['align'];
+          unset($attributes['align']);
+        }
+      }
+      if ($data['blockName'] == 'core/button') {
+        //wp_send_json($htmlContent);
+        $dom = new \DOMDocument();
+        $htmlString = "<html><body>" . $htmlContent . "</body></html>";
+        $htmlString = str_replace("\n", "", $htmlString);
+        $htmlString = str_replace("\r", "", $htmlString);
+        $htmlString = str_replace("\t", "", $htmlString);
+        $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $anchors = $dom->getElementsByTagName('a');
+        if($anchors && $anchors[0]){
+          $url = $anchors[0]->getAttribute('href');
+          if($url){
+            $attributes['url'] = $url;
+          }
+          $innerHtml = $dom->saveHTML($anchors[0]);
+          $innerHtml = preg_replace('/^<a[^>]*>|<\/a>$/', '', $innerHtml);
+          if($innerHtml){
+            $attributes['content'] = $innerHtml;
+          }
+        }
+        unset($dom);
+
+      }
+      if ($data['blockName'] == 'core/heading') {
+        // level assumes that if there's no value set for this attributes, then it's default value is 2
+        // so we need to make sure this is reflected in the attributes
+        if (!isset($attributes['level'])) {
+          $attributes['level'] = 2;
+        }
+        $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -5);
+      }
 
       if ($htmlContent && $data['blockName'] !== "core/pattern") {
         // if not core/cover, core/media-text, and has inner blocks, gut
@@ -295,7 +347,9 @@ if (!class_exists('WPGraphQLBlocks')) {
         $htmlContent = str_replace("\n", "", $htmlContent);
         $htmlContent = str_replace("\r", "", $htmlContent);
         $htmlContent = str_replace("\t", "", $htmlContent);
-        $this->htmlContent = $htmlContent;
+        if($query_args['htmlContent']){
+          $this->htmlContent = $htmlContent;
+        }
       }
 
       /*if ($core_post_template && $data['blockName'] === 'core/query') {
@@ -321,76 +375,9 @@ if (!class_exists('WPGraphQLBlocks')) {
         $this->innerBlocks = $innerBlocks;
       }
 
-      if ($this->name == 'core/gallery') {
-        $classId = $this->get_core_gallery_class_id($htmlContent);
-        $this->inlineClassnames = $classId;
-        $this->inlineStylesheet = $this->get_core_gallery_stylesheet($classId, $attributes);
+      if ($attributes) {
+        $this->attributes = $attributes;
       }
-    }
-
-    private function get_core_gallery_class_id($htmlContent)
-    {
-      $needle = "wp-block-gallery-";
-      $startPos = strpos($htmlContent, $needle);
-      $endPos = strpos($htmlContent, " ", $startPos);
-      $classId = substr($htmlContent, $startPos, $endPos - $startPos);
-      return $classId;
-    }
-
-    private function get_core_gallery_stylesheet($classId, $attributes)
-    {
-      $gap = _wp_array_get($attributes, array('style', 'spacing', 'blockGap'));
-      // Skip if gap value contains unsupported characters.
-      // Regex for CSS value borrowed from `safecss_filter_attr`, and used here
-      // because we only want to match against the value, not the CSS attribute.
-      if (is_array($gap)) {
-        foreach ($gap as $key => $value) {
-          // Make sure $value is a string to avoid PHP 8.1 deprecation error in preg_match() when the value is null.
-          $value = is_string($value) ? $value : '';
-          $value = $value && preg_match('%[\\\(&=}]|/\*%', $value) ? null : $value;
-
-          // Get spacing CSS variable from preset value if provided.
-          if (is_string($value) && str_contains($value, 'var:preset|spacing|')) {
-            $index_to_splice = strrpos($value, '|') + 1;
-            $slug            = _wp_to_kebab_case(substr($value, $index_to_splice));
-            $value           = "var(--wp--preset--spacing--$slug)";
-          }
-
-          $gap[$key] = $value;
-        }
-      } else {
-        // Make sure $gap is a string to avoid PHP 8.1 deprecation error in preg_match() when the value is null.
-        $gap = is_string($gap) ? $gap : '';
-        $gap = $gap && preg_match('%[\\\(&=}]|/\*%', $gap) ? null : $gap;
-
-        // Get spacing CSS variable from preset value if provided.
-        if (is_string($gap) && str_contains($gap, 'var:preset|spacing|')) {
-          $index_to_splice = strrpos($gap, '|') + 1;
-          $slug            = _wp_to_kebab_case(substr($gap, $index_to_splice));
-          $gap             = "var(--wp--preset--spacing--$slug)";
-        }
-      }
-
-      // --gallery-block--gutter-size is deprecated. --wp--style--gallery-gap-default should be used by themes that want to set a default
-      // gap on the gallery.
-      $fallback_gap = 'var( --wp--style--gallery-gap-default, var( --gallery-block--gutter-size, var( --wp--style--block-gap, 0.5em ) ) )';
-      $gap_value    = $gap ? $gap : $fallback_gap;
-      $gap_column   = $gap_value;
-
-      if (is_array($gap_value)) {
-        $gap_row    = isset($gap_value['top']) ? $gap_value['top'] : $fallback_gap;
-        $gap_column = isset($gap_value['left']) ? $gap_value['left'] : $fallback_gap;
-        $gap_value  = $gap_row === $gap_column ? $gap_row : $gap_row . ' ' . $gap_column;
-      }
-
-      // The unstable gallery gap calculation requires a real value (such as `0px`) and not `0`.
-      if ('0' === $gap_column) {
-        $gap_column = '0px';
-      }
-
-      // Set the CSS variable to the column value, and the `gap` property to the combined gap value.
-      $style = '.wp-block-gallery.' . $classId . '{ --wp--style--unstable-gallery-gap: ' . $gap_column . '; gap: ' . $gap_value . '}';
-      return $style;
     }
   }
 
@@ -408,6 +395,7 @@ if (!class_exists('WPGraphQLBlocks')) {
 
     public function init()
     {
+      
       add_action('graphql_register_types', function () {
         register_graphql_scalar('JSON', [
           'serialize' => function ($value) {
@@ -492,6 +480,7 @@ if (!class_exists('WPGraphQLBlocks')) {
               if (isset($core_post_template)) {
                 // replace the element at the specified index
                 $core_post_template_block_string = render_block($core_post_template);
+                
                 // at this point, add class names to the ul tag, based on the $data['attrs'] (i.e. the core/query attributes)
                 $core_post_template_block_string = substr($core_post_template_block_string, 0, strpos($core_post_template_block_string, ">")) . "></ul>";
 
@@ -522,7 +511,7 @@ if (!class_exists('WPGraphQLBlocks')) {
                 ]);
                 foreach ($result as $block) {
                   if (isset($block['blockName'])) {
-                    $mappedBlocksResult[] = new Block($block, $postId, null);
+                    $mappedBlocksResult[] = new Block($block, $postId, null, $query_args);
                   }
                 }
               }
@@ -534,11 +523,62 @@ if (!class_exists('WPGraphQLBlocks')) {
 
         register_graphql_field('ContentNode', 'blocks', [
           'type' => 'JSON',
+          'args' => [
+            'postTemplate' => [
+              'type' => 'Boolean',
+              'defaultValue' => true,
+              'description' => 'Also return the post template as JSON blocks. If set to false, only the post content will be returned as JSON blocks.',
+            ],
+            'htmlContent' => [
+              'type' => 'Boolean',
+              'defaultValue' => false,
+              'description' => 'Return the HTML markup of each block',
+            ],
+            'dynamicContent' => [
+              'type' => 'Boolean',
+              'defaultValue' => false,
+              'description' => '(Used for backwards compatibility with @webdeveducation/wp-block-tools)',
+            ],
+            'originalContent' => [
+              'type' => 'Boolean',
+              'defaultValue' => false,
+              'description' => '(Used for backwards compatibility with @webdeveducation/wp-block-tools)',
+            ],
+          ],
           'description' => __('Returns all blocks as a JSON object', 'wp-graphql-blocks'),
           'resolve' => function ($post, $args, $context, $info) {
-            $mappedBlocks = get_mapped_blocks($post);
-            //$mappedBlocks = clean_attributes($mappedBlocks);
+            $mappedBlocks = get_mapped_blocks($post, $args);
+            $mappedBlocks = clean_attributes($mappedBlocks);
             return wp_json_encode($mappedBlocks);
+          }
+        ]);
+
+        register_graphql_field( 'RootQuery', 'siteLogo', [
+          'type' => 'MediaItem',
+          'description' => __( 'The logo set in the customizer', 'wp-graphql-blocks' ),
+          'resolve' => function() {
+            $logo_id = get_theme_mod( 'custom_logo' );
+      
+            if ( ! isset( $logo_id ) || ! absint( $logo_id ) ) {
+              return null;
+            }
+      
+            $media_object = get_post( $logo_id );
+            return new \WPGraphQL\Model\Post( $media_object );
+          }
+        ]);
+
+        register_graphql_field( 'RootQuery', 'cssVariables', [
+          'type' => 'String',
+          'description' => __( 'All CSS variables for the current theme', 'wp-graphql-blocks' ),
+          'resolve' => function() {
+            $stylesheet = wp_get_global_stylesheet();
+            preg_match_all('/--[^;]*:[^;]*;/', $stylesheet, $matches);
+            $variables = implode($matches[0]);
+            $variables = str_replace("--wp--preset", "", $variables);
+            $variables = str_replace("--wp--style--global", "", $variables);
+            $variables = str_replace("--wp--style", "", $variables);
+            return $variables;
           }
         ]);
       });

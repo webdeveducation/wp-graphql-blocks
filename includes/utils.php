@@ -207,7 +207,7 @@ function get_query_by_id($query_id, $mappedBlocks)
   return traverse($query_id, $mappedBlocks);
 }
 
-function get_mapped_blocks($post)
+function get_mapped_blocks($post, $query_args)
 {
   $uri = $post->uri;
   $main_blog_page_id = get_option('page_for_posts');
@@ -242,40 +242,41 @@ function get_mapped_blocks($post)
 
   // if there are no template blocks, i.e. no template was found, 
   // then just set equal to the page blocks;
-  if (!$templateBlocks) {
+  if (!$templateBlocks || !$query_args['postTemplate']) {
     $templateBlocks = $blocks;
   }
 
   $mappedBlocks = [];
   foreach ($templateBlocks as $block) {
     if (isset($block['blockName'])) {
-      $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content);
+      $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content, $query_args);
     }
   }
   return $mappedBlocks;
 }
 
-function clean_attributes($blocks)
+function clean($blocks)
 {
-  function clean($blocks)
-  {
-    foreach ($blocks as $block) {
-      if ($block->attributes && $block->attributes['post_id_to_hydrate_template']) {
-        unset($block->attributes['post_id_to_hydrate_template']);
-      }
-      if ($block->attributes && $block->attributes['postTemplateRaw']) {
-        unset($block->attributes['postTemplateRaw']);
-      }
+  foreach ($blocks as $block) {
+    if ($block->attributes && $block->attributes['post_id_to_hydrate_template']) {
+      unset($block->attributes['post_id_to_hydrate_template']);
+    }
+    if ($block->attributes && $block->attributes['postTemplateRaw']) {
+      unset($block->attributes['postTemplateRaw']);
+    }
 
-      if (!$block->attributes || !count($block->attributes)) {
-        unset($block->attributes);
-      }
+    if (!$block->attributes || !count($block->attributes)) {
+      unset($block->attributes);
+    }
 
-      if ($block->innerBlocks) {
-        clean($block->innerBlocks);
-      }
+    if ($block->innerBlocks) {
+      clean($block->innerBlocks);
     }
   }
+}
+
+function clean_attributes($blocks)
+{
   clean($blocks);
   return $blocks;
 }
