@@ -57,16 +57,22 @@ if (!class_exists('WPGraphQLBlocks')) {
       }
   
       if($data['blockName'] == 'core/image'){
-        if(!$attributes['height'] && !$attributes['width']){
-          // get media item
-          $img = wp_get_attachment_image_src($attributes['id'], 'full');
-          if($img){
-            $attributes['url'] = $img[0];
-            $attributes['width'] = $img[1];
-            $attributes['height'] = $img[2];
-          }
-        }
-        // get link
+	// get media item
+	$img = wp_get_attachment_image_src($attributes['id'], 'full');
+	if($img) {
+	    $attributes['url'] = $img[0];
+	    if(!$attributes['height'] && !$attributes['width']) {
+		$attributes['width'] = $img[1];
+		$attributes['height'] = $img[2];
+	    }
+	}
+	// get link
+	if(str_contains($attributes['width'], 'px')) {
+	    $attributes['width'] = (int)preg_replace("/[^0-9]/", "", $attributes['width']);
+	}
+	if(str_contains($attributes['height'], 'px')) {
+	    $attributes['height'] = (int)preg_replace("/[^0-9]/", "", $attributes['height']);
+	}
         $dom = new \DOMDocument();
         $html = $this->originalContent ?? $this->dynamicContent;
         $htmlString = "<html><body>" . $html . "</body></html>";
