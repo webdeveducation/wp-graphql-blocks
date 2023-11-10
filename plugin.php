@@ -375,7 +375,7 @@ if (!class_exists('WPGraphQLBlocks')) {
         $this->innerBlocks = $innerBlocks;
       }
 
-      if ($attributes) {
+      if ($attributes && $query_args['attributes']) {
         $this->attributes = $attributes;
       }
     }
@@ -528,6 +528,11 @@ if (!class_exists('WPGraphQLBlocks')) {
               'type' => 'Boolean',
               'defaultValue' => true,
               'description' => 'Also return the post template as JSON blocks. If set to false, only the post content will be returned as JSON blocks.',
+            ],
+            'attributes' => [
+              'type' => 'Boolean',
+              'defaultValue' => true,
+              'description' => "Return each block's attributes as part of the response",
             ],
             'htmlContent' => [
               'type' => 'Boolean',
