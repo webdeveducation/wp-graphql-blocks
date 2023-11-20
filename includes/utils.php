@@ -209,6 +209,12 @@ function get_query_by_id($query_id, $mappedBlocks)
 
 function get_mapped_blocks($post, $query_args)
 {
+  // TODO get global styles for active theme
+  $global_styles = [];
+  $theme_slug = get_stylesheet();
+  // TODO get post by name: "wp-global-styles-" . $theme_slug
+  //wp_send_json($theme);
+
   $uri = $post->uri;
   $main_blog_page_id = get_option('page_for_posts');
   if ((!$post->ID && $uri === "/") || (!$post->ID && $main_blog_page_id !== "0") || ($post->ID == $main_blog_page_id)) {
@@ -249,7 +255,7 @@ function get_mapped_blocks($post, $query_args)
   $mappedBlocks = [];
   foreach ($templateBlocks as $block) {
     if (isset($block['blockName'])) {
-      $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content, $query_args);
+      $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content, $query_args, []);
     }
   }
   return $mappedBlocks;
