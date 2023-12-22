@@ -14,7 +14,7 @@ Download and install like any WordPress plugin.
 
 ## Usage
 
-This plugin can be used hand-in-hand with the @webdeveducation/wp-block-tools library to easily render core WordPress blocks in your React (Gatsby & Next) apps out of the box.
+This plugin can be used hand-in-hand with the @wp-block-tools/styles library to easily render core WordPress block styles in your Next JS / Astro JS / Angular projects.
 
 ## Modifying the attributes
 

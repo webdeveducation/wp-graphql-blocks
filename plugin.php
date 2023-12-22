@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://webdeveducation.com
- * Version: 2.0.2
+ * Version: 2.0.4
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -26,6 +26,26 @@ if (!class_exists('WPGraphQLBlocks')) {
   {
     public function __construct($data, $post_id, $post_content, $query_args, $global_styles)
     {
+      $blockString = render_block($data);
+      wp_reset_postdata();
+      $originalContent = str_replace("\n", "", $data['innerHTML']);
+      $dynamicContent = str_replace("\n", "", $blockString);
+
+      // dynamicContent and originalContent are false by default.
+      // if they are true, add them
+      if($query_args['dynamicContent']){
+        $this->dynamicContent = $dynamicContent;
+      }
+
+      if($query_args['originalContent']){
+        $this->originalContent = $originalContent;
+      }
+
+      $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
+      $htmlContent = str_replace("\n", "", $htmlContent);
+      $htmlContent = str_replace("\r", "", $htmlContent);
+      $htmlContent = str_replace("\t", "", $htmlContent);
+      
       $this->name = $data['blockName'];
       $attributes = $data['attrs'];
 
@@ -41,8 +61,10 @@ if (!class_exists('WPGraphQLBlocks')) {
         $custom_logo_id = get_theme_mod( 'custom_logo' );
         if($custom_logo_id){
           $logo = wp_get_attachment_image_src( $custom_logo_id , 'full' );
+          $image_alt = get_post_meta($custom_logo_id, '_wp_attachment_image_alt', TRUE);
           $attributes['id'] = (int)$custom_logo_id;
           $attributes['url'] = $logo[0];
+          $attributes['alt'] = $image_alt;
         }
       }
 
@@ -82,9 +104,54 @@ if (!class_exists('WPGraphQLBlocks')) {
           // get media item
           $img = wp_get_attachment_image_src($attributes['id'], 'full');
           if ($img) {
+            $image_alt = get_post_meta($attributes['id'], '_wp_attachment_image_alt', TRUE);
             $attributes['url'] = $img[0];
             $attributes['width'] = $img[1];
             $attributes['height'] = $img[2];
+            if($image_alt){
+              $attributes['alt'] = $image_alt;
+            }
+
+            $dom = new \DOMDocument();
+            $htmlString = "<html><body>" . $htmlContent . "</body></html>";
+            $htmlString = str_replace("\n", "", $htmlString);
+            $htmlString = str_replace("\r", "", $htmlString);
+            $htmlString = str_replace("\t", "", $htmlString);
+            $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+            $img_tags = $dom->getElementsByTagName('img');
+            if($img_tags && $img_tags[0]){
+              $alt = $img_tags[0]->getAttribute('alt');
+              if($alt){
+                $attributes['alt'] = $alt;
+              }
+            }
+            $fig_captions = $dom->getElementsByTagName('figcaption');
+            if($fig_captions && $fig_captions[0]){
+              $caption = $fig_captions[0]->nodeValue;
+              if($caption){
+                $attributes['caption'] = $caption;
+              }
+            }
+            $anchors = $dom->getElementsByTagName('a');
+            if($anchors && $anchors[0]){
+              $href = $anchors[0]->getAttribute('href');
+              $target = $anchors[0]->getAttribute('target');
+              $rel = $anchors[0]->getAttribute('rel');
+              $class_names = $anchors[0]->getAttribute('class');
+              if($href){
+                $attributes['href'] = $href;
+              }
+              if($target){
+                $attributes['target'] = $target;
+              }
+              if($rel){
+                $attributes['rel'] = $rel;
+              }
+              if($class_names){
+                $attributes['linkClassName'] = $class_names;
+              }
+            }
+            unset($dom);
           }
         }
       }
@@ -262,25 +329,7 @@ if (!class_exists('WPGraphQLBlocks')) {
         setup_postdata($post);
       }
 
-      $blockString = render_block($data);
-      wp_reset_postdata();
-      $originalContent = str_replace("\n", "", $data['innerHTML']);
-      $dynamicContent = str_replace("\n", "", $blockString);
-
-      // dynamicContent and originalContent are false by default.
-      // if they are true, add them
-      if($query_args['dynamicContent']){
-        $this->dynamicContent = $dynamicContent;
-      }
-
-      if($query_args['originalContent']){
-        $this->originalContent = $originalContent;
-      }
-
-      $htmlContent = $dynamicContent ? $dynamicContent : $originalContent;
-      $htmlContent = str_replace("\n", "", $htmlContent);
-      $htmlContent = str_replace("\r", "", $htmlContent);
-      $htmlContent = str_replace("\t", "", $htmlContent);
+      
 
       if($data['blockName'] === "core/list-item"){
         $attributes['content'] = substr($htmlContent, strpos($htmlContent, ">") + 1, -5);
@@ -294,7 +343,6 @@ if (!class_exists('WPGraphQLBlocks')) {
         }
       }
       if ($data['blockName'] == 'core/button') {
-        //wp_send_json($htmlContent);
         $dom = new \DOMDocument();
         $htmlString = "<html><body>" . $htmlContent . "</body></html>";
         $htmlString = str_replace("\n", "", $htmlString);
@@ -314,7 +362,6 @@ if (!class_exists('WPGraphQLBlocks')) {
           }
         }
         unset($dom);
-
       }
       if ($data['blockName'] == 'core/heading') {
         // level assumes that if there's no value set for this attributes, then it's default value is 2
