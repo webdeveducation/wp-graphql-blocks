@@ -5,8 +5,8 @@
  * Plugin URI: https://github.com/webdeveducation/wp-graphql-blocks
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
- * Author URI: https://webdeveducation.com
- * Version: 2.0.4
+ * Author URI: https://wp-block-tools.com
+ * Version: 2.0.5
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -24,7 +24,7 @@ if (!class_exists('WPGraphQLBlocks')) {
 
   class Block
   {
-    public function __construct($data, $post_id, $post_content, $query_args, $global_styles)
+    public function __construct($data, $post_id, $post_content, $query_args, $global_theme_styles, $global_db_styles)
     {
       $blockString = render_block($data);
       wp_reset_postdata();
@@ -53,8 +53,12 @@ if (!class_exists('WPGraphQLBlocks')) {
         $global_styles['core/button'] = $attributes['style']['elements']['button'];
       }
 
-      if($global_styles[$data['blockName']]){
-        $attributes['globalStyles'] = array_merge($attributes['globalStyles'] ?? [], $global_styles[$data['blockName']]);
+      if($global_theme_styles[$data['blockName']]){
+        $attributes['globalStyles'] = array_merge($attributes['globalStyles'] ?? [], $global_theme_styles[$data['blockName']]);
+      }
+
+      if($global_db_styles[$data['blockName']]){
+        $attributes['globalStyles'] = array_merge($attributes['globalStyles'] ?? [], $global_db_styles[$data['blockName']]);
       }
 
       if($data['blockName'] === "core/site-logo"){
@@ -318,7 +322,7 @@ if (!class_exists('WPGraphQLBlocks')) {
           $innerBlock['attrs']['post_id_to_hydrate_template'] = $attributes['post_id_to_hydrate_template'];
         }
         if (isset($innerBlock['blockName'])) {
-          $innerBlocks[] = new Block($innerBlock, $post_id, $post_content, $query_args, $global_styles);
+          $innerBlocks[] = new Block($innerBlock, $post_id, $post_content, $query_args, $global_theme_styles, $global_db_styles);
         }
       }
 
@@ -464,11 +468,9 @@ if (!class_exists('WPGraphQLBlocks')) {
           'args' => [
             'postId' => [
               'type' => ['non_null' => 'Int'],
-              'description' => 'Argument 1 description',
             ],
             'queryId' => [
               'type' => ['non_null' => 'Int'],
-              'description' => 'Argument 2 description',
             ],
             'page' => [
               'type' => ['non_null' => 'Int'],
@@ -566,7 +568,7 @@ if (!class_exists('WPGraphQLBlocks')) {
                 ]);
                 foreach ($result as $block) {
                   if (isset($block['blockName'])) {
-                    $mappedBlocksResult[] = new Block($block, $postId, null, $query_args, []);
+                    $mappedBlocksResult[] = new Block($block, $postId, null, $query_args, [], []);
                   }
                 }
               }
@@ -607,8 +609,6 @@ if (!class_exists('WPGraphQLBlocks')) {
           ],
           'description' => __('Returns all blocks as a JSON object', 'wp-graphql-blocks'),
           'resolve' => function ($post, $args, $context, $info) {
-            // get global styles
-            // `wp-global-styles-${themeName}`
             $mappedBlocks = get_mapped_blocks($post, $args);
             $mappedBlocks = clean_attributes($mappedBlocks);
             return wp_json_encode($mappedBlocks);

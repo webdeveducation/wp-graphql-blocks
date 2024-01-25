@@ -209,11 +209,30 @@ function get_query_by_id($query_id, $mappedBlocks)
 
 function get_mapped_blocks($post, $query_args)
 {
-  // TODO get global styles for active theme
-  $global_styles = [];
+  // get global styles from the theme.json file
+  $global_theme_styles = [];
+  $theme_directory = get_template_directory();
+  $theme_json_path = $theme_directory . '/theme.json';
+  if (file_exists($theme_json_path)) {
+    $theme_json_contents = file_get_contents($theme_json_path);
+    $theme_json_data = json_decode($theme_json_contents, true);
+    if($theme_json_data && $theme_json_data['styles'] && $theme_json_data['styles']['blocks']){
+      $global_theme_styles = $theme_json_data['styles']['blocks'];
+    }
+  }
+
+  // get global styles from db (these will be overrides from any default
+  // styles using the site editor, i.e. overriding any theme.json styles)
+  // `wp-global-styles-${themeName}`
+  $global_db_styles = [];
   $theme_slug = get_stylesheet();
-  // TODO get post by name: "wp-global-styles-" . $theme_slug
-  //wp_send_json($theme);
+  $global_styles_post = get_page_by_path("wp-global-styles-" . $theme_slug, OBJECT, 'wp_global_styles');
+  if ($global_styles_post && $global_styles_post->post_content) {
+    $decoded_global_styles = json_decode($global_styles_post->post_content, true);
+    if($decoded_global_styles && $decoded_global_styles['styles'] && $decoded_global_styles['styles']['blocks']){
+      $global_db_styles = $decoded_global_styles['styles']['blocks'];
+    }
+  }
 
   $uri = $post->uri;
   $main_blog_page_id = get_option('page_for_posts');
@@ -255,7 +274,7 @@ function get_mapped_blocks($post, $query_args)
   $mappedBlocks = [];
   foreach ($templateBlocks as $block) {
     if (isset($block['blockName'])) {
-      $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content, $query_args, []);
+      $mappedBlocks[] = new Block($block, $the_post_id, $the_post_content, $query_args, $global_theme_styles, $global_db_styles);
     }
   }
   return $mappedBlocks;
