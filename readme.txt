@@ -2,9 +2,9 @@
 Contributors: tomphill
 Tags: GraphQL, API, Gatsby, Headless, Decoupled, React, Nextjs, Vue, Apollo, REST, JSON, Gutenberg, Blocks
 Requires at least: 6.0
-Tested up to: 6.4.1
+Tested up to: 6.7.1
 Requires PHP: 7.1
-Stable tag: 2.1.1
+Stable tag: 2.1.2
 License: GPL-3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 

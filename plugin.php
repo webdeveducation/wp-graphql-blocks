@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://wp-block-tools.com
- * Version: 2.1.1
+ * Version: 2.1.2
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -104,60 +104,74 @@ if (!class_exists('WPGraphQLBlocks')) {
       }
 
       if ($data['blockName'] == 'core/image') {
-        if (!$attributes['height'] && !$attributes['width']) {
-          // get media item
-          $img = wp_get_attachment_image_src($attributes['id'], 'full');
-          if ($img) {
-            $image_alt = get_post_meta($attributes['id'], '_wp_attachment_image_alt', TRUE);
-            $attributes['url'] = $img[0];
-            $attributes['width'] = $img[1];
-            $attributes['height'] = $img[2];
-            if($image_alt){
-              $attributes['alt'] = $image_alt;
-            }
 
-            $dom = new \DOMDocument();
-            $htmlString = "<html><body>" . $htmlContent . "</body></html>";
-            $htmlString = str_replace("\n", "", $htmlString);
-            $htmlString = str_replace("\r", "", $htmlString);
-            $htmlString = str_replace("\t", "", $htmlString);
-            $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-            $img_tags = $dom->getElementsByTagName('img');
-            if($img_tags && $img_tags[0]){
-              $alt = $img_tags[0]->getAttribute('alt');
-              if($alt){
-                $attributes['alt'] = $alt;
-              }
-            }
-            $fig_captions = $dom->getElementsByTagName('figcaption');
-            if($fig_captions && $fig_captions[0]){
-              $caption = $fig_captions[0]->nodeValue;
-              if($caption){
-                $attributes['caption'] = $caption;
-              }
-            }
-            $anchors = $dom->getElementsByTagName('a');
-            if($anchors && $anchors[0]){
-              $href = $anchors[0]->getAttribute('href');
-              $target = $anchors[0]->getAttribute('target');
-              $rel = $anchors[0]->getAttribute('rel');
-              $class_names = $anchors[0]->getAttribute('class');
-              if($href){
-                $attributes['href'] = $href;
-              }
-              if($target){
-                $attributes['target'] = $target;
-              }
-              if($rel){
-                $attributes['rel'] = $rel;
-              }
-              if($class_names){
-                $attributes['linkClassName'] = $class_names;
-              }
-            }
-            unset($dom);
+        if($attributes['width']){
+          $attributes['displayWidth'] = $attributes['width'];
+        }
+
+        if($attributes['height']){
+          $attributes['displayHeight'] = $attributes['height'];
+        }
+
+        unset($attributes['height']);
+        unset($attributes['width']);
+
+        // get media item
+        $img = wp_get_attachment_image_src($attributes['id'], 'full');
+        if ($img) {
+          $image_alt = get_post_meta($attributes['id'], '_wp_attachment_image_alt', TRUE);
+          $attributes['url'] = $img[0];
+          $attributes['width'] = $img[1];
+          $attributes['height'] = $img[2];
+          if($image_alt){
+            $attributes['alt'] = $image_alt;
           }
         }
+        $dom = new \DOMDocument();
+        $htmlString = "<html><body>" . $htmlContent . "</body></html>";
+        $htmlString = str_replace("\n", "", $htmlString);
+        $htmlString = str_replace("\r", "", $htmlString);
+        $htmlString = str_replace("\t", "", $htmlString);
+        $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $img_tags = $dom->getElementsByTagName('img');
+        if($img_tags && $img_tags[0]){
+          $alt = $img_tags[0]->getAttribute('alt');
+          if($alt){
+            $attributes['alt'] = $alt;
+          }
+
+          if(!$attributes['url']){
+            $url = $img_tags[0]->getAttribute('src');
+            $attributes['url'] = $url;
+          }
+        }
+        $fig_captions = $dom->getElementsByTagName('figcaption');
+        if($fig_captions && $fig_captions[0]){
+          $caption = $fig_captions[0]->nodeValue;
+          if($caption){
+            $attributes['caption'] = $caption;
+          }
+        }
+        $anchors = $dom->getElementsByTagName('a');
+        if($anchors && $anchors[0]){
+          $href = $anchors[0]->getAttribute('href');
+          $target = $anchors[0]->getAttribute('target');
+          $rel = $anchors[0]->getAttribute('rel');
+          $class_names = $anchors[0]->getAttribute('class');
+          if($href){
+            $attributes['href'] = $href;
+          }
+          if($target){
+            $attributes['target'] = $target;
+          }
+          if($rel){
+            $attributes['rel'] = $rel;
+          }
+          if($class_names){
+            $attributes['linkClassName'] = $class_names;
+          }
+        }
+        unset($dom);
       }
 
       if ($data['blockName'] == 'core/columns') {
