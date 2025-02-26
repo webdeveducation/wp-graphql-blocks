@@ -6,7 +6,7 @@
  * Description: Enable blocks in WP GraphQL
  * Author: WebDevEducation 
  * Author URI: https://wp-block-tools.com
- * Version: 2.1.2
+ * Version: 2.2.0
  * Requires at least: 6.0
  * License: GPL-3
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -59,6 +59,35 @@ if (!class_exists('WPGraphQLBlocks')) {
 
       if($global_db_styles[$data['blockName']]){
         $attributes['globalStyles'] = array_merge($attributes['globalStyles'] ?? [], $global_db_styles[$data['blockName']]);
+      }
+
+      if($data['blockName'] === "core/audio"){
+        $dom = new \DOMDocument();
+        $htmlString = "<html><body>" . $htmlContent . "</body></html>";
+        $htmlString = str_replace("\n", "", $htmlString);
+        $htmlString = str_replace("\r", "", $htmlString);
+        $htmlString = str_replace("\t", "", $htmlString);
+        $dom->loadHTML($htmlString, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $audio_tags = $dom->getElementsByTagName('audio');
+        if($audio_tags && $audio_tags[0]){
+          if(!$attributes['src']){
+            $src = $audio_tags[0]->getAttribute('src');
+            $attributes['src'] = $src;
+          }
+          if(!$attributes['preload']){
+            $preload = $audio_tags[0]->getAttribute('preload');
+            $attributes['preload'] = $preload;
+          }
+          if(!$attributes['autoplay']){
+            $autoplay = $audio_tags[0]->hasAttribute('autoplay');
+            $attributes['autoplay'] = $autoplay;
+          }
+          if(!$attributes['loop']){
+            $loop = $audio_tags[0]->hasAttribute('loop');
+            $attributes['loop'] = $loop;
+          }
+        }
+        unset($dom);
       }
 
       if($data['blockName'] === "core/site-logo"){
