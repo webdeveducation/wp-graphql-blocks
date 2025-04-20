@@ -123,6 +123,16 @@ if (!class_exists('WPGraphQLBlocks')) {
       if($data['blockName'] == 'core/paragraph'){
         $attributes['content'] = substr($this->originalContent, strpos($this->originalContent, ">") + 1, -4);
       }
+    	if ($data['blockName'] == 'core/table') {
+		    $attributes = $data['attrs'] ?? [];
+		    $attributes['content'] = $htmlContent;
+
+		    if($attributes['align']){
+			    $attributes['textAlign'] = $attributes['align'];
+			    unset($attributes['align']);
+		    }
+
+	    }
       if($data['blockName'] == 'core/heading'){
         // level assumes that if there's no value set for this attributes, then it's default value is 2
         // so we need to make sure this is reflected in the attributes
